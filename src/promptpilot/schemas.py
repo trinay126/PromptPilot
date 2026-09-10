@@ -97,4 +97,41 @@ class ModelListResponse(BaseModel):
     object: str = "list"
     data: list[ModelInfo] = Field(default_factory=list)
 
+class AppConfig(BaseModel):
+    """User-editable configuration stored as JSON."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    api_key: str | None = None
+    model: str = DEFAULT_MODEL
+    timeout_seconds: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=300)
+    demo_limit: int = Field(default=10, ge=0, le=10_000)
+    demo_prompts_used: int = Field(default=0, ge=0)
+
+    @field_validator
+    @classmethod
+
+    def normalise_api_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        cleaned = value.strip()
+        return cleaned or None
+
+
+class PromptStat(BaseModel):
+    """One JSONL record used by the dashboard."""
+
+    timestamp: datetime = Field(default_factory=lambda:datetime.now(timezone.utc))
+    model: str
+    prompt_chars: int = Field(ge=0)
+    response_chars: int = Field(ge=0)
+    prompt_chars: int = Field(default=0, ge=0)
+    completion_tokens: int = Field(default=0, ge=0)
+    latency_ms: float = Field(ge=0)
+    source: Literal["demo", "user"]
+    success: bool = True
+    
+
+
+
 
