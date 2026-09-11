@@ -51,4 +51,33 @@ def retry_on_api_error(attempts: int = 3, delay_seconds: float = 0.5) -> Callabl
         return wrapper
     return decorator
 
+def async_retry_on_api_error(
+        attempts: int = 3,
+        delay_seconds: float = 0.5,
+) -> Callable[[Callable[P, Awaitable[R]]], Callable[P, Awaitable[R]]]:
+    """Async counterpart to 'retry_on_ai_error', using non-blocking sleeps."""
+
+    if attempts < 1:
+        raise ValueError("attempts must be at least 1")
+
+    def decorator(
+        function: Callable[P, Awaitable[R]]
+    ) -> Callable[P, Awaitable[R]]:
+        @functools.wraps(function)
+        async def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            last_error: GroqAPIError | None = None
+            for attempt in range(attempts):
+                try:
+                    return await function(*args, **kwargs)
+                except GroqAPIError as error:
+                    last_error = error
+                    if error.status_code not in {408, 429, 500, 503, 504}:
+                        raise
+                    if attempt + 1 < attempts:
+                        await asyncio.sleep(delay_seconds * (attempt + 1))
+            assert last_error is not None
+            raise last_error
+        return wrapper
+    return decorator
+
 
