@@ -57,5 +57,14 @@ class StatsStore:
             "requests": len(records),
             "successful" : successful,
             "failed": len(records) - successful,
-            ""
-        }
+            "average_latency_ms": round(mean(self.record.latency_ms for records in records), 2),
+            "prompt_tokens": sum(self.record.prompt_tokens for record in records),
+            "completion_tokens": sum(record.completion_tokens for record in records),
+            "last_model": records[-1].model,
+            }
+
+    def clear(self) -> None:
+        """Delete the JSONL file if it exists."""
+        with self._lock:
+            if self.path.exists():
+                self.path.unlink()
