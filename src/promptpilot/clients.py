@@ -50,5 +50,48 @@ class GroqApiClient:
                 f"Groq returned HTTP {response.status_code}: {response.text[:500]}",
                 status_code=response.status_code,
             )
-        
+
+    @timed
+    @retry_on_api_error(attempts=3)
+    def chat(self, request: ChatRequest) -> ChatResponse:
+        """POST a validates JSON body and validate the JSON response"""
+        try:
+            response = self._client.post(
+                "/chat/completions",
+                json=request.model_dump(exclude_none=True),
+            )    
+        except httpx.TimeoutException as error:
+            raise GroqAPIError("Groq request timed out") from error
+        except httpx.HTTPError as error:
+            raise GroqAPIError(f"network error while calling Groq: {error}") from error
+        self._request_error(response)
+        try:
+            return ChatResponse.model_validate(response.json())
+        except (ValueError, TypeError) as error:
+            raise SchemaError("Groq returned an unexpected completion payload") from error
+
+    def _build_request(
+            self,
+            prompt: str,
+            model: str | None = None,
+            system: str = "You are Promptpilot, a concise and helpful assistant.",
+            temperature: float = 0.2,
+            max_completions_tokens: int = 512,
+            stream: bool = False,
+    ) -> ChatRequest:
+        return ChatRequest(
+            model=model or self.model,
+            messages=[
+                ChatMessage(role="system", content=system),
+                ChatMessage(role="user", content=prompt),
+            ],
+            temperature=temperature,
+            max_completions_tokens=max_completions_tokens,
+            stream=stream,
+        )
+
+    def ask(self, prompt: str, model:str | None = None) -> ChatResponse:
+        """Convenience method for one non_streaming completion."""
+        return self.chat(self._build_request(prompt, model=model))
+
     
