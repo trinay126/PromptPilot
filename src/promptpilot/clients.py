@@ -94,4 +94,41 @@ class GroqApiClient:
         """Convenience method for one non_streaming completion."""
         return self.chat(self._build_request(prompt, model=model))
 
-    
+    def stream_chat(self, request: ChatRequest) -> Iterator[str]:
+        """
+        Yield text deltas from Groq's server-sent Events response.
+
+        Groq sends lines such as 'data: {"choices":[{"delta":{"content":"Hi"}}]}'
+        and finishes with 'data: [DONE]', We parse the wire format explicity so 
+        the CLI can display tokens immediately instead of waiting for the full answer.
+        """
+
+        payload = request.model_copy(update={"stream": True}).model_dump(exclude_none=True)
+
+        try:
+            with self._client.stream("POST", "/chat/completions", json=payload) as response:
+                self._request_error(response)
+                for line in response.iter_lines():
+                    if not line or not line.startswith("data:"):
+                        continue
+                    data = line.removeprefix("data:").strip()
+                    if data == "[DONE]":
+                        break
+                    try:
+                        event = json.loads(data)
+                    except json.JSONDecodeError as error:
+                        raise SchemaError("Groq returned malformed streaming JSON") from error
+
+                    choices = event.get("choices", [])
+                    if not choices:
+                        continue
+                    delta = choices[0].get("delta", {})
+                    content = delta.get("content") or ""
+                    if content:
+                        yield content
+        except httpx.TimeoutException as error:
+            raise GroqAPIError("Groq streaming request timed out") from error
+        except httpx.HTTPError as error:
+            raise GroqAPIError(f"network error while streaming from Groq: {error}") from error
+
+        
