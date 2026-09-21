@@ -131,4 +131,38 @@ class GroqApiClient:
         except httpx.HTTPError as error:
             raise GroqAPIError(f"network error while streaming from Groq: {error}") from error
 
-        
+    def stream(
+            self,
+            prompt: str,
+            model: str | None = None,
+            on_token: Callable[[str], None] | None = None,
+    ) -> str:
+        """Stream One prompt and return the complete text after the final chunk."""
+        chunks: list[str] = []
+        request = self._build_request(prompt, model=model, stream=True)
+        for token in self.stream_chat(request):
+            chunks.append(token)
+            if on_token:
+                on_token(token)
+        return "".join(chunks)
+
+    def list_models(self) -> ModelListResponse:
+        """Return the live model catalog from Groq."""
+        try:
+            response = self._client.get("/models")
+        except httpx.HTTPError as error:
+            raise GroqAPIError(f"network error while listing models: {error}") from error
+        self._request_error(response)
+        try:
+            return ModelListResponse.model_validate(response.json())
+        except (ValueError, TypeError) as error:
+            raise SchemaError("Groq returned an unexpected models payload") from error
+
+    def ask_many_sequential(
+            self, 
+            prompts: Iterable[str],
+            model: str | None = None,
+    ) -> list[ChatResponse]:
+        """Educational baseline used to compare with async gather."""
+        return [self.ask(prompt, model=model) for prompt in prompts]
+
