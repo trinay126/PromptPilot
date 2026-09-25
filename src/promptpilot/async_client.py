@@ -68,4 +68,45 @@ class AsyncGroqApiClient:
             return ChatResponse.model_validate(response.json())
         except (ValueError, TypeError) as error:
             raise SchemaError("Groq returned an unexpected async payload") from error
+    async def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
+        """Build and send a single async prompt."""
+        request = ChatRequest(
+            model=model or self.model,
+            messages=[ChatMessage(role="system", content="You are a PromptPilot, a helpful assistant."),
+                      ChatMessage(role="user", content=prompt),
+                      ],
+            temparature=0.2,
+            max_completion_tokens=512,
+        )
+        return await self.chat(request)
+
+    async def many(
+            self,
+            prompts: Iterable[str],
+            model: str | None = None,
+            return_exceptions: bool =  True,
+    ) -> list[ChatResponse | BaseException]:
+        """Run many coroutines concurrently and preserver input order.
+        'asyncio.gather' schedules all awaitables concurrently. Its result list
+        follows the order of the input awiatables, not completion order.
+        'return_exceptions=True' lets the CLI show partial batch results. 
+        """
+        jobs = [self.ask(prompt, model=model) for prompt in prompts]
+        return list(await asyncio.gather(*jobs, return_exceptions=return_exceptions))
+
+    async def list_models(self) -> ModelListResponse:
+        """Fetch the live model catalog asynchronously."""
+        try:
+            response = await self._client.get("/models")
+        except httpx.HTTPError as error:
+            raise GroqAPIError(f"async network error while listing models: {error}") from error
+        if response.is_error:
+            raise GroqAPIError(
+                f"Groq returned HTTP {response.status_code}:{response.text[:500]}",
+                status_code=response.status_code
+            )
+        try:
+            return ModelListResponse.model_validate(response.json())
+        except (ValueError, TypeError) as error:
+            raise SchemaError("Groq returned an unexpected async models payload") from error
         
