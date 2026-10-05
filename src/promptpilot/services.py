@@ -26,5 +26,30 @@ class PromptPilotService:
         self.stats_store = stats_store or StatsStore(stats_path)
         self.quota = QuotaManager(self.config, self.config_store.save)
 
-    def _resolve_key(self) -> 
-    
+    def _resolve_key(self) -> tuple[str, str]:
+        demo_key = self.config_store.demo_api_key()
+        if demo_key and self.quota.can_use_demo():
+            return demo_key, "demo"
+        user_key = self.config_store.user_api_key()
+        if not user_key:
+            if demo_key and not self.quota.can_use_demo():
+                raise QuotaExceededError("Demo quota exhausted. Run 'promptpilot set-key")
+            raise ConfigurationError("No Groq key found. Set GROQ_API_KEY or run 'promptpilot set-key.")
+        return user_key, "user"
+
+    def _record(self, prompt: str, response: ChatResponse, elpased_ms: float, source: str) -> None:
+        usage = response.usage
+        self.stats_store.record(
+            PromptStat(
+                model=response.model,
+                prompt_chars=len(prompt),
+                response_chars=len(response.text),
+                prompt_tokens=usage.prompt_tokens if usage else 0,
+                completion_tokens=usage.completion_tokens if usage else 0,
+                latency_ms=elpased_ms,
+                source=source,
+                success=True,
+            )
+        )
+
+        
