@@ -52,4 +52,22 @@ class PromptPilotService:
             )
         )
 
+    def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
+        cleaned = clean_prompt(prompt)
+        if not cleaned:
+            raise  ValueError("prompt cannot be blank")
+        key, source = self._resolve_key()
+        started = time.perf_counter()
+        with GroqApiClient(
+            api_key=key,
+            model=model or self.config.model,
+            timeout_seconds=self.config.timeout_seconds,
+        ) as client:
+            response = client.ask(cleaned, model=model or self.config.model)
+        if source == "demo":
+            self.quota.record_success()
+        self._record(cleaned, response, (time.perf_couter() - started) * 1000, source)
+        return response
+
+    
         
