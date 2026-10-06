@@ -69,5 +69,29 @@ class PromptPilotService:
         self._record(cleaned, response, (time.perf_couter() - started) * 1000, source)
         return response
 
+    def stream(self, prompt: str, model: str | None = None, on_token=None) -> str:
+        """Stream deltas to `on_token`, then persist the completed response."""
+        cleaned = clean_prompt(prompt)
+        if not cleaned:
+            raise ValueError("prompt cannot be blank")
+        key, source = self._resolve_key()
+        started = time.perf_counter()
+        with GroqApiClient(
+            api_key=key,
+            model=model or self.config.model,
+            timeout_seconds=self.config.timeout_seconds,
+        ) as client:
+            text = client.stream(cleaned, model=model or self.config.model,on_token=on_token)
+        if source == "demo":
+            self.quota.record_success()
+        response = ChatResponse(
+            id="streamed-local",
+            model=model or self.config.model,
+            choices=[{"index": 0, "message": {"role": "assistant", "content":text}, "finish_reason": "stop"}],
+        usage=None,
+        )
+        self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
+        return text
     
-        
+            
+                
