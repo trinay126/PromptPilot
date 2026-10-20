@@ -6,14 +6,15 @@ import json
 from pathlib import Path
 from threading import Lock
 
-from promptpilot.schemas import PromptStat  
+from promptpilot.schemas import PromptStat
 from promptpilot.utils import mean
+
 
 class StatsStore:
     """Append one validated JSON object per line and calculate summaries."""
 
     def __init__(self, path: Path) -> None:
-        self.path = Path
+        self.path = path
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = Lock()
 
@@ -24,10 +25,9 @@ class StatsStore:
             file.write(line + "\n")
 
     def all(self) -> list[PromptStat]:
-        """Read all valid records; ski[ blank lines but fail on corrupt data."""
+        """Read all valid records; skip blank lines but fail on corrupt data."""
         if not self.path.exists():
             return []
-
         records: list[PromptStat] = []
         with self.path.open("r", encoding="utf-8") as file:
             for line_number, line in enumerate(file, start=1):
@@ -40,10 +40,10 @@ class StatsStore:
         return records
 
     def summary(self) -> dict[str, int | float | str]:
-        """Return useful aggreagate values for the dashboard."""
+        """Return useful aggregate values for the dashboard."""
         records = self.all()
         if not records:
-            return{
+            return {
                 "requests": 0,
                 "successful": 0,
                 "failed": 0,
@@ -53,15 +53,15 @@ class StatsStore:
                 "last_model": "none",
             }
         successful = sum(1 for record in records if record.success)
-        return{
+        return {
             "requests": len(records),
-            "successful" : successful,
+            "successful": successful,
             "failed": len(records) - successful,
-            "average_latency_ms": round(mean(self.record.latency_ms for records in records), 2),
-            "prompt_tokens": sum(self.record.prompt_tokens for record in records),
+            "average_latency_ms": round(mean(record.latency_ms for record in records), 2),
+            "prompt_tokens": sum(record.prompt_tokens for record in records),
             "completion_tokens": sum(record.completion_tokens for record in records),
             "last_model": records[-1].model,
-            }
+        }
 
     def clear(self) -> None:
         """Delete the JSONL file if it exists."""
