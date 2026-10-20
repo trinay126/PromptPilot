@@ -516,3 +516,22 @@ def test_unknown_command_reports_a_suggestion() -> None:
 
     assert result.exit_code == 2
     assert "benchmark" in result.output
+
+
+def test_broken_pipe_exits_quietly(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`promptpilot --help | head` must not print a traceback."""
+    from promptpilot import cli
+
+    def raise_broken_pipe(*args, **kwargs):
+        raise BrokenPipeError(32, "Broken pipe")
+
+    group = cli.PromptPilotGroup(name="x")
+    monkeypatch.setattr(type(group).__mro__[1], "main", raise_broken_pipe)
+    # pytest replaces stdout with its own capture file, so redirecting the
+    # real file descriptor would break the capture. Neutralise just that.
+    monkeypatch.setattr(cli.os, "dup2", lambda *args: None)
+
+    with pytest.raises(SystemExit) as caught:
+        group.main()
+
+    assert caught.value.code == 141

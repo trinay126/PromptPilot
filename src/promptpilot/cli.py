@@ -78,18 +78,28 @@ class PromptPilotGroup(typer.core.TyperGroup):
         kwargs.setdefault("standalone_mode", False)
         try:
             result = super().main(*args, **kwargs)
+        except BrokenPipeError:
+            # The reader closed the pipe, for example `promptpilot --help | head`.
+            # Point stdout at devnull so the interpreter does not report the
+            # broken pipe again while shutting down, then exit quietly.
+            try:
+                devnull = os.open(os.devnull, os.O_WRONLY)
+                os.dup2(devnull, sys.stdout.fileno())
+            except (OSError, ValueError):
+                pass
+            raise SystemExit(141) from None
         except click_exceptions.NoArgsIsHelpError:
             # Typer already rendered the help page, so nothing left to show.
             raise SystemExit(0) from None
+        except typer.Abort:
+            console.print("[muted]Aborted.[/muted]")
+            raise SystemExit(1) from None
         except click_exceptions.UsageError as error:
             show_usage_error(error.format_message(), _command_name(error))
             raise SystemExit(error.exit_code) from None
         except click_exceptions.ClickException as error:
             show_error(error.format_message())
             raise SystemExit(error.exit_code) from None
-        except click_exceptions.Abort:
-            console.print("[muted]Aborted.[/muted]")
-            raise SystemExit(1) from None
         if isinstance(result, int):
             raise SystemExit(result)
         return result
