@@ -10,7 +10,7 @@ UI and backed by a fully typed, fully tested service layer.
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f?logo=open-source-initiative&logoColor=white)](LICENSE)
-[![CI](https://github.com/trinay126/PromptPilot/actions/workflows/release-windows.yml/badge.svg)](https://github.com/trinay126/PromptPilot/actions/workflows/release-windows.yml)
+[![CI](https://github.com/trinay126/PromptPilot/actions/workflows/release.yml/badge.svg)](https://github.com/trinay126/PromptPilot/actions/workflows/release.yml)
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
 [![Typed](https://img.shields.io/badge/typing-annotated-2A6DB2?logo=python&logoColor=white)](src/promptpilot/schemas.py)
 
@@ -110,7 +110,7 @@ adapter could reuse it without rewriting the Groq integration.
 - [Architecture](#architecture)
 - [Project layout](#project-layout)
 - [Development](#development)
-- [Windows executable](#windows-executable)
+- [Releases](#releases)
 - [Troubleshooting](#troubleshooting)
 - [FAQ](#faq)
 - [Security model](#security-model)
@@ -160,6 +160,9 @@ Verify it:
 ```bash
 promptpilot --version
 ```
+
+> **No Python at all?** Every release ships a standalone Linux binary that needs
+> no interpreter — see [Releases](#releases).
 
 > **Prefer a local checkout?** Clone the repository and use a virtual
 > environment instead:
@@ -343,7 +346,7 @@ Two Windows differences worth knowing:
   use `promptpilot --install-completion` if you use a compatible shell.
 
 A ready-to-run `promptpilot.exe` is published with every release — see
-[Windows executable](#windows-executable).
+[Releases](#releases).
 
 ---
 
@@ -1006,9 +1009,11 @@ PromptPilot/
 │   ├── test_chat.py               # interactive session
 │   └── test_ui.py                 # presentation layer
 ├── scripts/
-│   └── build_windows.ps1          # PyInstaller release bundle
+│   ├── build_linux.sh             # PyInstaller release bundle for Linux
+│   └── build_windows.ps1          # PyInstaller release bundle for Windows
 └── .github/workflows/
-    └── release-windows.yml        # test matrix + release publishing
+    ├── release.yml                # test matrix + release publishing
+    └── publish-pypi.yml           # publish the wheel and sdist to PyPI
 ```
 
 ---
@@ -1040,26 +1045,88 @@ ruff: all checks passed
 
 ---
 
-## Windows executable
+## Releases
 
-```powershell
-.\scripts\build_windows.ps1
+Every release publishes four things: a **Linux** standalone binary, a
+**Windows** standalone executable, a **Python wheel**, and a **source
+distribution**. Pick whichever suits you.
+
+| Platform | Asset | Needs Python? |
+|---|---|---|
+| Linux | `promptpilot-vX.Y.Z-linux-x64.tar.gz` | no |
+| Windows | `promptpilot-vX.Y.Z-windows-x64.zip` | no |
+| Any | `promptpilot-X.Y.Z-py3-none-any.whl` | yes |
+| Any | `promptpilot-X.Y.Z.tar.gz` | yes |
+
+Download them from the
+[Releases page](https://github.com/trinay126/PromptPilot/releases). Each bundle
+contains a `SHA256SUMS.txt` file so you can verify the download:
+
+```bash
+sha256sum -c SHA256SUMS.txt
 ```
 
-The script installs dependencies, runs the test suite, builds `promptpilot.exe`
-with PyInstaller, smoke-tests the binary, and produces a versioned bundle:
+### Linux — standalone binary
+
+No Python required. Download, extract, and put it on your `PATH`:
+
+```bash
+VERSION=v1.0.0
+curl -LO "https://github.com/trinay126/PromptPilot/releases/download/${VERSION}/promptpilot-${VERSION}-linux-x64.tar.gz"
+tar -xzf "promptpilot-${VERSION}-linux-x64.tar.gz"
+sudo install -m 0755 "promptpilot-${VERSION}-linux-x64/promptpilot" /usr/local/bin/promptpilot
+promptpilot --version
+```
+
+### Linux — with pipx (recommended)
+
+Isolated from your system Python, and upgrades with `pipx upgrade`:
+
+```bash
+pipx install promptpilot
+```
+
+### Windows — standalone executable
+
+Download `promptpilot-vX.Y.Z-windows-x64.zip`, extract it, and run
+`promptpilot.exe`. Add the folder to your `PATH` to use it from anywhere.
+
+```powershell
+$env:Path += ";$PWD\promptpilot-v1.0.0-windows-x64"
+promptpilot --version
+```
+
+### Any platform — Python package
+
+```bash
+pip install promptpilot
+```
+
+### Build it yourself
+
+The same scripts the release workflow uses are in the repository:
+
+```bash
+./scripts/build_linux.sh                 # Linux bundle
+.\scripts\build_windows.ps1              # Windows bundle (PowerShell)
+```
+
+Each script installs the dependencies, runs the whole test suite, builds the
+binary with PyInstaller, smoke-tests it, and writes a versioned bundle:
 
 ```text
 artifacts/
-└── promptpilot-v1.0.0-windows-x64/
-    ├── promptpilot.exe
-    ├── release-manifest.json
-    └── SHA256SUMS.txt
+├── promptpilot-v1.0.0-linux-x64/
+│   ├── promptpilot
+│   ├── release-manifest.json
+│   └── SHA256SUMS.txt
+└── promptpilot-v1.0.0-linux-x64.tar.gz
 ```
 
-PyInstaller is not a cross-compiler, so the build runs on Windows. The
-`release-windows.yml` workflow tests Python 3.11, 3.12, and 3.13 on every pull
-request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
+PyInstaller is not a cross-compiler, so the Windows bundle must be built on
+Windows. The `release.yml` workflow tests Linux, macOS, and Windows on every
+pull request, and a `v*.*.*` tag publishes the signed bundles to a GitHub
+release.
 
 ---
 
