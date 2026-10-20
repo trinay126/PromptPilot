@@ -1,21 +1,12 @@
 <div align="center">
 
-<pre>
-    ____                             __  ____  _ __      __
-   / __ \_________  ____ ___  ____  / /_/ __ \(_) /___  / /_
-  / /_/ / ___/ __ \/ __ `__ \/ __ \/ __/ /_/ / / / __ \/ __/
- / ____/ /  / /_/ / / / / / / /_/ / /_/ ____/ / / /_/ / /_
-/_/   /_/   \____/_/ /_/ /_/ .___/\__/_/   /_/_/\____/\__/
-                          /_/
-</pre>
-
 # PromptPilot
 
 **A production-minded Groq AI command-line workbench.**
 
-Real SSE streaming, an interactive multi-turn chat, live model benchmarking,
-local statistics, and machine-readable output — wrapped in a polished terminal
-UI and backed by a fully typed, fully tested service layer.
+Real SSE streaming · interactive multi-turn chat · live model benchmarking ·
+local statistics · machine-readable `--json` output — wrapped in a polished
+terminal UI and backed by a fully typed, fully tested service layer.
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f?logo=open-source-initiative&logoColor=white)](LICENSE)
@@ -23,7 +14,46 @@ UI and backed by a fully typed, fully tested service layer.
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
 [![Typed](https://img.shields.io/badge/typing-annotated-2A6DB2?logo=python&logoColor=white)](src/promptpilot/schemas.py)
 
-[Install](#quick-start) &nbsp;·&nbsp; [Commands](#command-reference) &nbsp;·&nbsp; [Configure](#configuration) &nbsp;·&nbsp; [Architecture](#architecture) &nbsp;·&nbsp; [Develop](#development)
+[**Install**](#quick-start) &nbsp;·&nbsp; [**Commands**](#command-reference) &nbsp;·&nbsp; [**Configure**](#configuration) &nbsp;·&nbsp; [**Architecture**](#architecture) &nbsp;·&nbsp; [**Develop**](#development)
+
+</div>
+
+```text
+┌────────────────────────────────────────────────────────────────────────────┐
+│ ●  ●  ●   promptpilot — Groq AI command-line workbench                     │
+├────────────────────────────────────────────────────────────────────────────┤
+│ ╭───────────────────────── llama-3.1-8b-instant ─────────────────────────╮ │
+│ │                                                                        │ │
+│ │  A decorator wraps a callable to add behaviour without changing its    │ │
+│ │  signature.                                                            │ │
+│ │                                                                        │ │
+│ │                                                                        │ │
+│ │   import functools                                                     │ │
+│ │                                                                        │ │
+│ │   def logged(func):                                                    │ │
+│ │       @functools.wraps(func)                                           │ │
+│ │       def wrapper(*args, **kwargs):                                    │ │
+│ │           print(f'calling {func.__name__}')                            │ │
+│ │           return func(*args, **kwargs)                                 │ │
+│ │       return wrapper                                                   │ │
+│ │                                                                        │ │
+│ │                                                                        │ │
+│ │  Read the source of the wrappers you use — most of them are a dozen    │ │
+│ │  lines long.                                                           │ │
+│ │                                                                        │ │
+│ ╰──────────────── 18 prompt + 142 completion = 160 total ────────────────╯ │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+<div align="center">
+
+**Get started in three commands**
+
+```bash
+pip install -e ".[dev]"
+promptpilot config set-key
+promptpilot ask "Explain Python decorators in one paragraph."
+```
 
 </div>
 
@@ -94,35 +124,39 @@ adapter could reuse it without rewriting the Groq integration.
 
 Every capture below is real terminal output.
 
-**`promptpilot ask "..."` — answers are rendered as Markdown, with token accounting in the footer:**
+**`promptpilot chat` — an interactive session that keeps the conversation in context:**
 
 ```text
-╭────────────────────────────── llama-3.1-8b-instant ──────────────────────────────╮
-│                                                                                  │
-│  A decorator is a callable that receives another callable and returns a new      │
-│  callable that usually extends its behaviour.                                    │
-│                                                                                  │
-│   import functools                                                               │
-│   import time                                                                    │
-│                                                                                  │
-│   def timed(func):                                                               │
-│       @functools.wraps(func)                                                     │
-│       def wrapper(*args, **kwargs):                                              │
-│           started = time.perf_counter()                                          │
-│           try:                                                                   │
-│               return func(*args, **kwargs)                                       │
-│           finally:                                                               │
-│               print(f"{func.__name__} took {time.perf_counter() -                │
-│   started:.2f}s")                                                                │
-│       return wrapper                                                             │
-│                                                                                  │
-│  Three things make it useful:                                                    │
-│                                                                                  │
-│   1 functools.wraps keeps the original name and docstring                        │
-│   2 the wrapper is transparent to the caller                                     │
-│   3 behaviour is added once, not at every call site                              │
-│                                                                                  │
-╰───────────────────── 18 prompt + 142 completion = 160 total ─────────────────────╯
+╭──────────────────────────────────────╮
+│                                      │
+│    PromptPilot                       │
+│    Groq AI command-line workbench    │
+│    by Chadalavada Trinay Sai         │
+│                                      │
+╰──────────────────────────────────────╯
+Type a prompt and press enter. Use /help to list commands, /exit to quit.
+
+you > ╭─────────────────────────── llama-3.1-8b-instant ───────────────────────────╮
+│                                                                            │
+│  A decorator wraps a callable to add behaviour without changing its        │
+│  signature.                                                                │
+│                                                                            │
+│                                                                            │
+│   import functools                                                         │
+│                                                                            │
+│   def logged(func):                                                        │
+│       @functools.wraps(func)                                               │
+│       def wrapper(*args, **kwargs):                                        │
+│           print(f'calling {func.__name__}')                                │
+│           return func(*args, **kwargs)                                     │
+│       return wrapper                                                       │
+│                                                                            │
+│                                                                            │
+│  Read the source of the wrappers you use — most of them are a dozen lines  │
+│  long.                                                                     │
+│                                                                            │
+╰────────────────── 18 prompt + 142 completion = 160 total ──────────────────╯
+you > Bye.
 ```
 
 **`promptpilot ask --stream "..."` — tokens print the moment Groq emits them:**
