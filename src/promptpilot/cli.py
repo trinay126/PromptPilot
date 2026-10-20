@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import asdict
 
 import typer
@@ -21,6 +22,7 @@ from promptpilot.ui import (
     ask_with_spinner,
     console,
     emit_json,
+    emit_json_line,
     response_dict,
     show_banner,
     show_batch,
@@ -200,6 +202,10 @@ def chat(
         show_setup_intro()
         raise typer.Exit(code=1)
 
+    if wants_json(ctx):
+        _chat_json(current, model=model)
+        return
+
     show_banner()
     show_info(
         "Type a prompt and press enter. Use /help to list commands, /exit to quit."
@@ -241,6 +247,23 @@ def chat(
         show_response(answer)
 
     console.print("[muted]Bye.[/muted]")
+
+
+def _chat_json(current: PromptPilotService, model: str | None = None) -> None:
+    """Read one prompt per line from stdin and emit one JSON object per line."""
+    history: list[ChatMessage] = []
+    for line in sys.stdin:
+        command = line.strip()
+        if not command:
+            continue
+        try:
+            answer = current.ask_with_history(command, history, model=model)
+        except (PromptPilotError, ValueError) as error:
+            emit_json_line({"error": str(error), "type": type(error).__name__})
+            continue
+        history.append(ChatMessage(role="user", content=command))
+        history.append(ChatMessage(role="assistant", content=answer.text))
+        emit_json_line(response_dict(answer))
 
 
 @app.command()

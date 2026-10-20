@@ -45,6 +45,13 @@ def emit_json(value: object) -> None:
     print(json.dumps(value, indent=2, default=str))
 
 
+def emit_json_line(value: object) -> None:
+    """Print one compact JSON object per line for streaming automation."""
+    if is_dataclass(value):
+        value = asdict(value)
+    print(json.dumps(value, separators=(",", ":"), default=str))
+
+
 def show_banner() -> None:
     """Print the application banner."""
     console.print(
@@ -364,6 +371,7 @@ __all__ = [
     "ask_with_spinner",
     "console",
     "emit_json",
+    "emit_json_line",
     "error_console",
     "response_dict",
     "show_banner",
