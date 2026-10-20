@@ -63,7 +63,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **12** | **191** | **89%** | **0** |
+| **12** | **197** | **89%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | License |
 |:------------:|:----------:|:-------------:|:-------:|
@@ -457,13 +457,9 @@ it explicitly:
 honoured automatically, so tools like `bat`, `ripgrep`, and `ls` behave the
 same way in your environment.
 
-Exit codes follow the usual Unix convention:
-
-| Code | Meaning |
-|---|---|
-| `0` | Success |
-| `1` | A handled error (missing key, API failure, invalid configuration) |
-| `2` | A usage error (unknown command, missing argument, bad option) |
+Exit codes follow the usual Unix convention: `0` for success, `1` for a
+handled error, and `2` for a usage mistake. See
+[Troubleshooting](#troubleshooting) for the full table.
 
 A worked example — pull the average latency out of the dashboard with `jq`:
 
@@ -728,6 +724,14 @@ promptpilot history --limit 25
 Compare end-to-end latency for the same prompt across models. This issues a
 real request per model per round, so keep `--rounds` small while exploring.
 
+Run it with no arguments and it benchmarks your **preferred model**:
+
+```bash
+promptpilot benchmark
+```
+
+Name the models you want to compare by repeating `--model`:
+
 ```bash
 promptpilot benchmark \
   --model llama-3.1-8b-instant \
@@ -736,11 +740,21 @@ promptpilot benchmark \
   --prompt "Reply with the single word OK."
 ```
 
+Or sweep the whole live catalog with `--all`:
+
+```bash
+promptpilot benchmark --all --rounds 1
+```
+
 | Option | Default | Description |
 |---|---|---|
-| `--model`, `-m` | *required* | Repeat the benchmark for each model |
+| `--model`, `-m` | your preferred model | Models to compare. Repeat the flag for each one. |
 | `--prompt`, `-p` | `Reply with the single word OK.` | Prompt to send each round |
 | `--rounds` | `3` | Repeats per model (1–20) |
+| `--all` | off | Benchmark every model in your live catalog |
+
+`--all` can mean a lot of requests, so PromptPilot asks for confirmation
+whenever the run would exceed 20 requests, and you can cancel with `n`.
 
 Latency depends on network conditions, rate limits, and model warm-up, so
 treat the output as an engineering observation rather than a permanent ranking.
@@ -992,7 +1006,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 191 tests, no network, no API key
+├── tests/                         # 197 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -1037,7 +1051,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-191 passed
+197 passed
 89% coverage
 ruff: all checks passed
 ```
@@ -1068,6 +1082,31 @@ request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
 ---
 
 ## Troubleshooting
+
+### Usage errors show you what to type
+
+If you get the syntax wrong, PromptPilot says so in its own style and prints a
+command that actually works — never a raw stack trace:
+
+```text
+╭─────────────────────────────────── Usage ────────────────────────────────────╮
+│                                                                              │
+│  Option '--model' requires an argument.                                      │
+│                                                                              │
+│  Try:                                                                        │
+│    promptpilot benchmark --model llama-3.1-8b-instant --rounds 3             │
+│  Run 'benchmark --help' for the full list of options.                        │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+Exit codes follow the usual Unix convention:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | A handled error (missing key, API failure, invalid configuration) |
+| `2` | A usage error (unknown command, missing argument, bad option) |
 
 <details>
 <summary><strong>"promptpilot: command not found"</strong></summary>
