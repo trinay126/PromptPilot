@@ -31,6 +31,11 @@ _CTRL_D = "\x04"
 _BACKSPACE = ("\x7f", "\b")
 _ENTER = ("\r", "\n")
 
+# How long to wait for the rest of an escape sequence. Terminals send the
+# whole sequence at once, but the bytes can take a moment to arrive over a
+# slow or heavily loaded connection, so this is generous on purpose.
+_ESCAPE_TIMEOUT = 0.2
+
 MAX_VISIBLE = 14
 
 
@@ -71,13 +76,25 @@ def _read_key(fd: int) -> str:
     char = raw.decode("utf-8", "replace")
 
     if char == _ESCAPE:
-        sequence = ""
-        while len(sequence) < 2 and select.select([fd], [], [], 0.05)[0]:
+        rest = b""
+        while len(rest) < 2 and select.select([fd], [], [], _ESCAPE_TIMEOUT)[0]:
             chunk = os.read(fd, 1)
             if not chunk:
                 # End of file: the escape sequence was incomplete.
                 break
-            sequence += chunk.decode("utf-8", "replace")
+            rest += chunk
+        return decode_key(char, rest)
+    return decode_key(char, b"")
+
+
+def decode_key(char: str, rest: bytes = b"") -> str:
+    """Turn the bytes read from the terminal into a key name.
+
+    Kept separate from the I/O so that the escape-sequence handling can be
+    tested without depending on terminal timing.
+    """
+    if char == _ESCAPE:
+        sequence = rest.decode("utf-8", "replace")
         if sequence == _ARROW_UP:
             return KEY_UP
         if sequence == _ARROW_DOWN:

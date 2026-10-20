@@ -1,5 +1,8 @@
 """Tests for the interactive model picker."""
 
+import select
+import time
+
 import pytest
 
 from promptpilot.picker import filter_models, group_by_owner
@@ -128,9 +131,33 @@ def test_read_key_decodes_arrow_keys() -> None:
 
     reader = _key_stream(b"\x1b[A")
     try:
+        # Give the bytes time to arrive before the reader looks for them.
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline:
+            if select.select([reader], [], [], 0.05)[0]:
+                break
         assert _read_key(reader.fileno()) == "up"
     finally:
         reader.close()
+
+
+def test_decode_key_maps_escape_sequences() -> None:
+    from promptpilot.picker import decode_key
+
+    assert decode_key("\x1b", b"[A") == "up"
+    assert decode_key("\x1b", b"[B") == "down"
+    assert decode_key("\x1b", b"") == "escape"
+    assert decode_key("\x1b", b"x") == "escape"
+
+
+def test_decode_key_maps_plain_keys() -> None:
+    from promptpilot.picker import decode_key
+
+    assert decode_key("a") == "a"
+    assert decode_key("\x7f") == "backspace"
+    assert decode_key("\r") == "enter"
+    assert decode_key("\x04") == "eof"
+    assert decode_key("\x00") == "ignore"
 
 
 def test_read_key_decodes_backspace_and_enter() -> None:
