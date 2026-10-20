@@ -33,7 +33,7 @@ def test_stream_request_asks_the_api_for_a_streamed_response() -> None:
         client.stream("say hello")
 
     request = route.calls.last.request
-    assert request.content and b'"stream": true' in request.content
+    assert request.content and b'"stream":true' in request.content
 
 
 @respx.mock
