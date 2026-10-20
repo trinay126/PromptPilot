@@ -14,9 +14,7 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def timed(
-    function: Callable[P, R],
-) -> Callable[P, R]:
+def timed(function: Callable[P, R]) -> Callable[P, R]:
     """Attach the most recent duration to a callable without changing its API."""
 
     @functools.wraps(function)
@@ -50,7 +48,7 @@ def retry_on_api_error(
                     return function(*args, **kwargs)
                 except GroqAPIError as error:
                     last_error = error
-                    if error.status_code not in {408, 429, 500, 502, 503, 504}:
+                    if not error.is_retryable:
                         raise
                     if attempt + 1 < attempts:
                         time.sleep(delay_seconds * (attempt + 1))
@@ -82,7 +80,7 @@ def async_retry_on_api_error(
                     return await function(*args, **kwargs)
                 except GroqAPIError as error:
                     last_error = error
-                    if error.status_code not in {408, 429, 500, 502, 503, 504}:
+                    if not error.is_retryable:
                         raise
                     if attempt + 1 < attempts:
                         await asyncio.sleep(delay_seconds * (attempt + 1))
@@ -92,3 +90,6 @@ def async_retry_on_api_error(
         return wrapper
 
     return decorator
+
+
+__all__ = ["async_retry_on_api_error", "retry_on_api_error", "timed"]
