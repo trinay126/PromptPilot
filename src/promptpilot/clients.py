@@ -84,6 +84,23 @@ class GroqApiClient:
         except (ValueError, TypeError) as error:
             raise SchemaError("Groq returned an unexpected completion payload") from error
 
+    def build_request(
+        self,
+        messages: list[ChatMessage],
+        model: str | None = None,
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
+        stream: bool = False,
+    ) -> ChatRequest:
+        """Build a validated request from an explicit list of messages."""
+        return ChatRequest(
+            model=model or self.model,
+            messages=messages,
+            temperature=temperature,
+            max_completion_tokens=max_completion_tokens,
+            stream=stream,
+        )
+
     def _build_request(
         self,
         prompt: str,
@@ -93,12 +110,12 @@ class GroqApiClient:
         max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
         stream: bool = False,
     ) -> ChatRequest:
-        return ChatRequest(
-            model=model or self.model,
-            messages=[
+        return self.build_request(
+            [
                 ChatMessage(role="system", content=system),
                 ChatMessage(role="user", content=prompt),
             ],
+            model=model,
             temperature=temperature,
             max_completion_tokens=max_completion_tokens,
             stream=stream,
