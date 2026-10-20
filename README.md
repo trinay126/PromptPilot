@@ -63,7 +63,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **11** | **163** | **88%** | **0** |
+| **11** | **164** | **88%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | License |
 |:------------:|:----------:|:-------------:|:-------:|
@@ -934,7 +934,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 163 tests, no network, no API key
+├── tests/                         # 164 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -978,7 +978,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-163 passed
+164 passed
 88% coverage
 ruff: all checks passed
 ```
