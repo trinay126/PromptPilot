@@ -54,9 +54,16 @@ class GroqApiClient:
     def _request_error(self, response: httpx.Response) -> None:
         if response.is_error:
             raise GroqAPIError(
-                f"Groq returned HTTP {response.status_code}: {response.text[:500]}",
+                f"Groq returned HTTP {response.status_code}: {self._error_body(response)}",
                 status_code=response.status_code,
             )
+
+    @staticmethod
+    def _error_body(response: httpx.Response) -> str:
+        """Return the response body, reading it first when it is still streaming."""
+        if not response.is_closed:
+            response.read()
+        return response.text[:500]
 
     @timed
     @retry_on_api_error(attempts=3)
