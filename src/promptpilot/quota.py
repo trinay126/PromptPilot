@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from threading import Lock
+from typing import Callable
 
 from promptpilot.exceptions import QuotaExceededError
 from promptpilot.schemas import AppConfig
@@ -11,24 +12,33 @@ from promptpilot.schemas import AppConfig
 class QuotaManager:
     """Manage successful demo prompts without charging user-owned keys."""
 
-    def __init__(self, config: AppConfig, save_config) -> None:
+    def __init__(self, config: AppConfig, save_config: Callable[[AppConfig], object]) -> None:
         self._config = config
         self._save_config = save_config
         self._lock = Lock()
 
     @property
     def limit(self) -> int:
+        """Return the total number of demo prompts allowed."""
         return self._config.demo_limit
 
     @property
     def used(self) -> int:
+        """Return how many demo prompts have already been consumed."""
         return self._config.demo_prompts_used
 
     @property
     def remaining(self) -> int:
-        return max(0, self.limit - self.used)
+        """Return how many demo prompts are still available."""
+        return self._config.demo_prompts_remaining
+
+    @property
+    def exhausted(self) -> bool:
+        """Report whether the demo allowance has been fully consumed."""
+        return self.remaining == 0
 
     def can_use_demo(self) -> bool:
+        """Report whether another demo prompt may run."""
         return self.remaining > 0
 
     def record_success(self) -> None:
@@ -50,3 +60,6 @@ class QuotaManager:
     def summary(self) -> dict[str, int]:
         """Return dashboard-friendly quota data."""
         return {"limit": self.limit, "used": self.used, "remaining": self.remaining}
+
+
+__all__ = ["QuotaManager"]
