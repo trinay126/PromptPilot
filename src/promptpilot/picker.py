@@ -20,6 +20,7 @@ KEY_DOWN = "down"
 KEY_ENTER = "enter"
 KEY_BACKSPACE = "backspace"
 KEY_ESCAPE = "escape"
+KEY_EOF = "eof"
 KEY_IGNORE = "ignore"
 
 _ESCAPE = "\x1b"
@@ -61,14 +62,22 @@ def filter_models(
 def _read_key(fd: int) -> str:
     """Read a single key press, decoding arrow-key escape sequences."""
     try:
-        char = os.read(fd, 1).decode("utf-8", "replace")
+        raw = os.read(fd, 1)
     except OSError:
-        return KEY_IGNORE
+        return KEY_EOF
+    if not raw:
+        # The input stream reached end of file.
+        return KEY_EOF
+    char = raw.decode("utf-8", "replace")
 
     if char == _ESCAPE:
         sequence = ""
         while len(sequence) < 2 and select.select([fd], [], [], 0.05)[0]:
-            sequence += os.read(fd, 1).decode("utf-8", "replace")
+            chunk = os.read(fd, 1)
+            if not chunk:
+                # End of file: the escape sequence was incomplete.
+                break
+            sequence += chunk.decode("utf-8", "replace")
         if sequence == _ARROW_UP:
             return KEY_UP
         if sequence == _ARROW_DOWN:
@@ -81,7 +90,7 @@ def _read_key(fd: int) -> str:
     if char == _CTRL_C:
         raise KeyboardInterrupt
     if char == _CTRL_D:
-        return KEY_ESCAPE
+        return KEY_EOF
     if char.isprintable():
         return char
     return KEY_IGNORE
@@ -197,6 +206,9 @@ def pick_model(
                     selected = 0
                 elif key == KEY_ESCAPE:
                     return None
+                elif key == KEY_EOF:
+                    # The input stream closed, so there is nothing more to read.
+                    return None
                 elif key == KEY_ENTER:
                     if visible:
                         return visible[selected].id
@@ -214,6 +226,7 @@ __all__ = [
     "KEY_BACKSPACE",
     "KEY_DOWN",
     "KEY_ENTER",
+    "KEY_EOF",
     "KEY_ESCAPE",
     "KEY_IGNORE",
     "KEY_UP",

@@ -99,74 +99,87 @@ def test_render_reports_when_nothing_matches() -> None:
     assert "No model matches" in _flatten(panel)
 
 
-def test_read_key_decodes_plain_characters(tmp_path) -> None:
-    import os
+def _key_stream(data: bytes):
+    """Return a readable file descriptor pre-loaded with `data`.
 
+    A socket pair is used rather than a regular file because `select.select`
+    only accepts sockets on Windows.
+    """
+    import socket
+
+    reader, writer = socket.socketpair()
+    writer.sendall(data)
+    writer.close()
+    return reader
+
+
+def test_read_key_decodes_plain_characters() -> None:
     from promptpilot.picker import _read_key
 
-    path = tmp_path / "keys"
-    path.write_bytes(b"x")
-    fd = os.open(path, os.O_RDONLY)
-
+    reader = _key_stream(b"x")
     try:
-        assert _read_key(fd) == "x"
+        assert _read_key(reader.fileno()) == "x"
     finally:
-        os.close(fd)
+        reader.close()
 
 
-def test_read_key_decodes_arrow_keys(tmp_path) -> None:
-    import os
-
+def test_read_key_decodes_arrow_keys() -> None:
     from promptpilot.picker import _read_key
 
-    path = tmp_path / "keys"
-    path.write_bytes(b"\x1b[A")
-    fd = os.open(path, os.O_RDONLY)
-
+    reader = _key_stream(b"\x1b[A")
     try:
-        assert _read_key(fd) == "up"
+        assert _read_key(reader.fileno()) == "up"
     finally:
-        os.close(fd)
+        reader.close()
 
 
-def test_read_key_decodes_backspace_and_enter(tmp_path) -> None:
-    import os
-
+def test_read_key_decodes_backspace_and_enter() -> None:
     from promptpilot.picker import _read_key
 
-    path = tmp_path / "keys"
-    path.write_bytes(b"\x7f")
-    fd = os.open(path, os.O_RDONLY)
+    reader = _key_stream(b"\x7f")
     try:
-        assert _read_key(fd) == "backspace"
+        assert _read_key(reader.fileno()) == "backspace"
     finally:
-        os.close(fd)
+        reader.close()
 
-    path2 = tmp_path / "keys2"
-    path2.write_bytes(b"\r")
-    fd2 = os.open(path2, os.O_RDONLY)
+    reader = _key_stream(b"\r")
     try:
-        assert _read_key(fd2) == "enter"
+        assert _read_key(reader.fileno()) == "enter"
     finally:
-        os.close(fd2)
+        reader.close()
 
 
-def test_read_key_raises_on_ctrl_c(tmp_path) -> None:
-    import os
-
+def test_read_key_raises_on_ctrl_c() -> None:
     import pytest
 
     from promptpilot.picker import _read_key
 
-    path = tmp_path / "keys"
-    path.write_bytes(b"\x03")
-    fd = os.open(path, os.O_RDONLY)
-
+    reader = _key_stream(b"\x03")
     try:
         with pytest.raises(KeyboardInterrupt):
-            _read_key(fd)
+            _read_key(reader.fileno())
     finally:
-        os.close(fd)
+        reader.close()
+
+
+def test_read_key_treats_a_lone_escape_as_cancel() -> None:
+    from promptpilot.picker import _read_key
+
+    reader = _key_stream(b"\x1b")
+    try:
+        assert _read_key(reader.fileno()) == "escape"
+    finally:
+        reader.close()
+
+
+def test_read_key_reports_eof_when_the_stream_closes() -> None:
+    from promptpilot.picker import _read_key
+
+    reader = _key_stream(b"")
+    try:
+        assert _read_key(reader.fileno()) == "eof"
+    finally:
+        reader.close()
 
 
 def test_picker_available_is_false_without_a_terminal() -> None:
