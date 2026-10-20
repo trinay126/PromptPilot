@@ -10,10 +10,37 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: windows-release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  lint:
+    name: Lint with ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install ruff
+
+      - name: Run ruff
+        run: ruff check src tests
+
   test:
     name: Test on Python ${{ matrix.python-version }}
     runs-on: windows-latest
+    needs: lint
     strategy:
       fail-fast: false
       matrix:
@@ -38,6 +65,9 @@ jobs:
 
       - name: Verify CLI contract
         run: python -m promptpilot --help
+
+      - name: Verify the CLI version flag
+        run: python -m promptpilot --version
 
   release:
     name: Build and publish Windows release
