@@ -144,3 +144,20 @@ def test_saved_config_round_trips_through_a_new_store(tmp_path: Path) -> None:
 
     assert reloaded.model == "round-trip"
     assert reloaded.timeout_seconds == 7.0
+
+
+def test_dotenv_file_is_loaded_from_the_working_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A .env in the current directory is honoured, as a user would expect."""
+    (tmp_path / ".env").write_text(
+        "GROQ_API_KEY=gsk_from_dotenv_file\nPROMPTPILOT_MODEL=env-file-model\n",
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+
+    store = ConfigStore(tmp_path / "config.json")
+
+    assert store.user_api_key() == "gsk_from_dotenv_file"
+    assert store.load().model == "env-file-model"

@@ -7,7 +7,7 @@ import os
 import sys
 from pathlib import Path
 
-from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 
 from promptpilot.constants import (
     APP_NAME,
@@ -25,7 +25,9 @@ class ConfigStore:
     """Read and write application configuration as a JSON file."""
 
     def __init__(self, path: Path | None = None) -> None:
-        load_dotenv()
+        # Search for a .env file from the working directory upwards, which is
+        # what a user expects when running the CLI inside a project folder.
+        load_dotenv(find_dotenv(usecwd=True))
         self.path = path or self.default_path()
         self.path.parent.mkdir(parents=True, exist_ok=True)
 

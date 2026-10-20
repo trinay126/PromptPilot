@@ -63,7 +63,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **10** | **156** | **88%** | **0** |
+| **11** | **163** | **88%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | License |
 |:------------:|:----------:|:-------------:|:-------:|
@@ -103,8 +103,12 @@ adapter could reuse it without rewriting the Groq integration.
 - [Screenshots](#screenshots)
 - [Requirements](#requirements)
 - [Quick start](#quick-start)
+- [Linux and other Unix systems](#linux-and-other-unix-systems)
 - [Command cheat sheet](#command-cheat-sheet)
 - [Command reference](#command-reference)
+  - [ask](#ask) · [chat](#chat) · [batch](#batch) · [models](#models)
+  - [dashboard](#dashboard) · [history](#history) · [benchmark](#benchmark) · [probe](#probe)
+  - [clear-stats](#clear-stats) · [completions](#completions) · [config](#config)
 - [Automation with `--json`](#automation-with---json)
 - [Configuration](#configuration)
 - [Under the hood](#under-the-hood)
@@ -237,6 +241,10 @@ Fastest: llama-3.3-70b-versatile
 Runtime dependencies: `httpx`, `pydantic`, `python-dotenv`, `rich`, `typer`.
 That is the whole list.
 
+On Linux, [pipx](https://pipx.pypa.io/) is the recommended way to install the
+tool, and shell completion is supported for `bash`, `zsh`, and `fish` — see
+[Linux and other Unix systems](#linux-and-other-unix-systems).
+
 ---
 
 ## Quick start
@@ -276,6 +284,216 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 ---
 
+## Linux and other Unix systems
+
+PromptPilot is a native Unix citizen: it uses XDG paths, reads `.env` files,
+speaks your shell's completion protocol, and stays quiet and machine-readable
+when it is not attached to a terminal.
+
+### Install
+
+Two supported routes, depending on whether you want to *use* the tool or
+*develop* it.
+
+**As a user — [`pipx`](https://pipx.pypa.io/).** `pipx` installs the tool into
+its own isolated virtual environment and puts it on your `PATH`. No `sudo`, no
+`pip install --user`, and no risk of breaking the system Python:
+
+```bash
+# Debian/Ubuntu
+sudo apt install pipx && pipx ensurepath
+
+# Fedora
+sudo dnf install pipx && pipx ensurepath
+
+# Arch
+sudo pacman -S python-pipx && pipx ensurepath
+
+# from source, straight from git
+pipx install git+https://github.com/trinay126/PromptPilot.git
+```
+
+`pipx ensurepath` adds `~/.local/bin` to your `PATH`; restart the shell
+afterwards.
+
+**As a developer — a local virtual environment:**
+
+```bash
+git clone https://github.com/trinay126/PromptPilot.git
+cd PromptPilot
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Use `python3` rather than `python` on distributions where `python` is not
+mapped to Python 3 — most modern Linux systems do not provide a bare `python`
+command at all.
+
+### Shell completion
+
+Tab completion for commands, subcommands, and options works with `bash`,
+`zsh`, and `fish`.
+
+```bash
+# bash — the standard bash-completion location
+mkdir -p ~/.local/share/bash-completion/completions
+promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
+```
+
+```bash
+# zsh
+mkdir -p ~/.zfunc
+promptpilot completions zsh > ~/.zfunc/_promptpilot
+echo 'fpath+=~/.zfunc' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+```
+
+```bash
+# fish
+mkdir -p ~/.config/fish/completions
+promptpilot completions fish > ~/.config/fish/completions/promptpilot.fish
+```
+
+Because the script goes to **stdout**, you can place it wherever your setup
+expects it — a dotfiles repository, a Debian package, a container image, or a
+Nix/Home Manager configuration:
+
+```bash
+# dotfiles repository, managed by chezmoi / stow / yadm
+promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
+
+# container image
+RUN promptpilot completions bash > /etc/bash_completion.d/promptpilot
+
+# Nix (Home Manager)
+programs.bash.enableCompletion = true;
+programs.bash.completions.promptpilot = "${pkgs.promptpilot}/share/bash-completion/completions/promptpilot";
+```
+
+If you would rather not manage the file yourself, the built-in installer writes
+it for you:
+
+```bash
+promptpilot --install-completion     # writes to the default location for your shell
+promptpilot --show-completion        # print it without installing
+```
+
+### Where configuration lives
+
+On Linux, PromptPilot follows the **XDG Base Directory** specification:
+
+```text
+$XDG_CONFIG_HOME/promptpilot/config.json     # default: ~/.config/promptpilot/config.json
+$XDG_CONFIG_HOME/promptpilot/stats.jsonl     # local request history
+```
+
+Override the location for a single run, or for a whole CI job:
+
+```bash
+XDG_CONFIG_HOME=/tmp/promptpilot-config promptpilot config show
+```
+
+A `.env` file in the working directory is loaded automatically, which is handy
+for a project checkout:
+
+```bash
+cat > .env <<'EOF'
+GROQ_API_KEY=gsk_your_key_here
+PROMPTPILOT_MODEL=llama-3.3-70b-versatile
+EOF
+```
+
+`.env` is git-ignored by default. Remember that `GROQ_API_KEY` in the
+environment takes precedence over nothing else — a key saved with
+`promptpilot config set-key` wins over the environment variable.
+
+### Headless, pipes, and CI
+
+When output is piped or redirected, PromptPilot detects that it is not a
+terminal and drops the interactive chrome automatically. You can also control
+it explicitly:
+
+| Need | Command |
+|---|---|
+| Plain text, no ANSI colour | `promptpilot --no-color dashboard` |
+| Honour the `NO_COLOR` standard | `NO_COLOR=1 promptpilot dashboard` |
+| Force colour back on | `promptpilot --color dashboard` |
+| Pure JSON, no styling at all | `promptpilot --json dashboard` |
+| Detect a non-interactive terminal | `TERM=dumb promptpilot dashboard` |
+
+`NO_COLOR` follows the [no-color.org](https://no-color.org/) convention and is
+honoured automatically, so tools like `bat`, `ripgrep`, and `ls` behave the
+same way in your environment.
+
+Exit codes follow the usual Unix convention:
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+| `1` | A handled error (missing key, API failure, invalid configuration) |
+| `2` | A usage error (unknown command, missing argument, bad option) |
+
+A worked example — pull the average latency out of the dashboard with `jq`:
+
+```bash
+promptpilot --json dashboard | jq -r '.stats.average_latency_ms'
+```
+
+### Running on a schedule
+
+Because the tool is scriptable, `systemd` and `cron` both work. A **user**
+timer keeps the key in your own environment rather than a system-wide secret:
+
+```ini
+# ~/.config/systemd/user/promptpilot-report.service
+[Service]
+Type=oneshot
+Environment=GROQ_API_KEY=gsk_your_key_here
+ExecStart=%h/.local/bin/promptpilot --json dashboard
+```
+
+```ini
+# ~/.config/systemd/user/promptpilot-report.timer
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl --user enable --now promptpilot-report.timer
+systemctl --user list-timers
+```
+
+The same thing with `cron`:
+
+```cron
+0 9 * * * GROQ_API_KEY=gsk_your_key_here /usr/local/bin/promptpilot --json dashboard >> ~/promptpilot.log 2>&1
+```
+
+### Running inside a container
+
+The project installs cleanly into a slim image:
+
+```dockerfile
+FROM python:3.12-slim
+RUN pip install --no-cache-dir git+https://github.com/trinay126/PromptPilot.git
+ENTRYPOINT ["promptpilot"]
+```
+
+```bash
+docker run --rm -e GROQ_API_KEY promptpilot ask "Hello from a container"
+```
+
+Mount a volume at `/root/.config/promptpilot` if you want the configuration and
+statistics to survive between runs.
+
+---
+
 ## Command cheat sheet
 
 ```bash
@@ -306,6 +524,9 @@ promptpilot config set-model llama-3.3-70b-versatile
 promptpilot config show
 promptpilot config path
 
+# shell integration
+promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
+
 # automation
 promptpilot --json dashboard | jq .stats
 ```
@@ -318,16 +539,24 @@ Run `promptpilot --help` for the full list, or `promptpilot <command> --help`
 for the options of a single command.
 
 ```text
+
  Usage: promptpilot [OPTIONS] COMMAND [ARGS]...
 
  PromptPilot — Groq AI command-line workbench.
 
 ╭─ Options ────────────────────────────────────────────────────────────────────╮
-│ --json                Emit one JSON document for automation.                 │
-│ --version             Show the installed version and exit.                   │
-│ --install-completion  Install completion for the current shell.              │
-│ --show-completion     Show completion for the current shell.                 │
-│ --help                Show this message and exit.                            │
+│ --json                                  Emit one JSON document for           │
+│                                         automation.                          │
+│ --color                 --no-color      Force colour on or off. By default   │
+│                                         the NO_COLOR environment variable is │
+│                                         respected.                           │
+│ --version                               Show the installed version and exit. │
+│ --install-completion                    Install completion for the current   │
+│                                         shell.                               │
+│ --show-completion                       Show completion for the current      │
+│                                         shell, to copy it or customize the   │
+│                                         installation.                        │
+│ --help                                  Show this message and exit.          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
 │ ask          Send one prompt and print the answer.                           │
@@ -340,8 +569,16 @@ for the options of a single command.
 │ benchmark    Compare end-to-end latency for one prompt across models.        │
 │ probe        Demonstrate a thread pool with independent tiny API requests.   │
 │ clear-stats  Delete the local statistics history.                            │
+│ completions  Print the shell completion script for bash, zsh, or fish.       │
 │ config       Manage your local PromptPilot configuration.                    │
 ╰──────────────────────────────────────────────────────────────────────────────╯
+
+ Examples
+   promptpilot config set-key                 store your Groq API key
+   promptpilot ask "Explain Python decorators"
+   promptpilot ask --stream "Write a haiku"  show tokens as they arrive
+   promptpilot chat                          start an interactive session
+   promptpilot --json dashboard | jq .stats  machine-readable output
 ```
 
 ### `ask`
@@ -467,6 +704,19 @@ Delete the local statistics history.
 ```bash
 promptpilot clear-stats
 ```
+
+### `completions`
+
+Print the shell completion script for `bash`, `zsh`, or `fish` to stdout.
+
+```bash
+promptpilot completions bash
+promptpilot completions zsh
+promptpilot completions fish
+```
+
+Printing to stdout (rather than writing to a fixed path) means the script can go
+anywhere your setup expects it — see [Linux and other Unix systems](#linux-and-other-unix-systems).
 
 ### `config`
 
@@ -670,7 +920,7 @@ PromptPilot/
 ├── src/promptpilot/
 │   ├── __init__.py                # package metadata
 │   ├── __main__.py                # `python -m promptpilot`
-│   ├── cli.py                     # Typer commands and the `config` sub-app
+│   ├── cli.py                     # Typer commands, `config` sub-app, completions
 │   ├── ui.py                      # Rich theme, panels, tables, JSON serializers
 │   ├── services.py                # PromptPilotService — the application facade
 │   ├── clients.py                 # sync REST client + SSE streaming
@@ -684,7 +934,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 156 tests, no network, no API key
+├── tests/                         # 163 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -728,7 +978,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-156 passed
+163 passed
 88% coverage
 ruff: all checks passed
 ```
