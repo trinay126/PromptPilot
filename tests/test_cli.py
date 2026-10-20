@@ -317,3 +317,61 @@ def test_errors_are_reported_as_text_in_human_mode(monkeypatch: pytest.MonkeyPat
 
     assert result.exit_code == 1
     assert "No Groq key found." in result.output
+
+
+def test_completions_prints_a_bash_script() -> None:
+    result = runner.invoke(app, ["completions", "bash"])
+
+    assert result.exit_code == 0
+    assert "_promptpilot_completion" in result.output
+    assert "_PROMPTPILOT_COMPLETE=complete_bash" in result.output
+
+
+def test_completions_prints_a_zsh_script() -> None:
+    result = runner.invoke(app, ["completions", "zsh"])
+
+    assert result.exit_code == 0
+    assert "#compdef promptpilot" in result.output
+
+
+def test_completions_prints_a_fish_script() -> None:
+    result = runner.invoke(app, ["completions", "fish"])
+
+    assert result.exit_code == 0
+    assert "complete --command promptpilot" in result.output
+
+
+def test_completions_rejects_an_unsupported_shell() -> None:
+    result = runner.invoke(app, ["completions", "powershell"])
+
+    assert result.exit_code != 0
+    assert "unsupported shell" in result.output
+
+
+def test_completions_json_mode_returns_the_script() -> None:
+    result = runner.invoke(app, ["--json", "completions", "bash"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["shell"] == "bash"
+    assert "_promptpilot_completion" in payload["script"]
+
+
+def test_no_color_flag_disables_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    from promptpilot import ui
+
+    monkeypatch.setattr(ui.console, "no_color", False)
+    result = runner.invoke(app, ["--no-color", "dashboard"])
+
+    assert result.exit_code == 0
+    assert ui.console.no_color is True
+
+
+def test_color_flag_re_enables_colour(monkeypatch: pytest.MonkeyPatch) -> None:
+    from promptpilot import ui
+
+    monkeypatch.setattr(ui.console, "no_color", True)
+    result = runner.invoke(app, ["--color", "dashboard"])
+
+    assert result.exit_code == 0
+    assert ui.console.no_color is False

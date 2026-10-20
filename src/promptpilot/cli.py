@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import os
 import sys
 from dataclasses import asdict
 
 import typer
+from typer.completion import get_completion_script
 
 from promptpilot import __version__
 from promptpilot.benchmark import fastest_summary
-from promptpilot.constants import APP_NAME, APP_TAGLINE
+from promptpilot.constants import APP_NAME, APP_TAGLINE, COMPLETE_ENV_VAR, SUPPORTED_SHELLS
 from promptpilot.exceptions import (
     ConfigurationError,
     GroqAPIError,
@@ -23,6 +25,7 @@ from promptpilot.ui import (
     console,
     emit_json,
     emit_json_line,
+    error_console,
     response_dict,
     show_banner,
     show_batch,
@@ -85,6 +88,11 @@ def root(
     json_output: bool = typer.Option(
         False, "--json", help="Emit one JSON document for automation."
     ),
+    color: bool | None = typer.Option(
+        None,
+        "--color/--no-color",
+        help="Force colour on or off. By default the NO_COLOR environment variable is respected.",
+    ),
     version: bool = typer.Option(
         None,
         "--version",
@@ -96,6 +104,14 @@ def root(
     """Root callback that stores global options on the context."""
     ctx.ensure_object(dict)
     ctx.obj["json"] = json_output
+    if color is not None:
+        # Rich resolves no_color when the console is built, so set it directly.
+        console.no_color = not color
+        error_console.no_color = not color
+        if color:
+            os.environ.pop("NO_COLOR", None)
+        else:
+            os.environ["NO_COLOR"] = "1"
 
 
 def wants_json(ctx: typer.Context) -> bool:
@@ -373,6 +389,35 @@ def clear_stats(ctx: typer.Context) -> None:
         emit_json({"cleared": True})
     else:
         show_success("Statistics cleared.")
+
+
+@app.command()
+def completions(
+    ctx: typer.Context,
+    shell: str = typer.Argument(
+        "bash", help="Shell to generate completion for: bash, zsh, or fish."
+    ),
+) -> None:
+    """Print the shell completion script for bash, zsh, or fish.
+
+    Write the output to the file your shell reads, for example:
+
+        promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
+        promptpilot completions zsh  > ~/.zfunc/_promptpilot
+    """
+    name = shell.strip().lower()
+    if name not in SUPPORTED_SHELLS:
+        supported = ", ".join(SUPPORTED_SHELLS)
+        raise typer.BadParameter(f"unsupported shell {shell!r}; choose one of: {supported}")
+    script = get_completion_script(
+        prog_name="promptpilot",
+        complete_var=COMPLETE_ENV_VAR,
+        shell=name,
+    )
+    if wants_json(ctx):
+        emit_json({"shell": name, "script": script})
+        return
+    print(script)
 
 
 @config_app.command("show")

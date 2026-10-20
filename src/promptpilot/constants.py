@@ -29,9 +29,14 @@ ENV_API_KEY: Final[str] = "GROQ_API_KEY"
 ENV_MODEL: Final[str] = "PROMPTPILOT_MODEL"
 ENV_TIMEOUT_SECONDS: Final[str] = "PROMPTPILOT_TIMEOUT_SECONDS"
 
+# Shell completion support.
+COMPLETE_ENV_VAR: Final[str] = "_PROMPTPILOT_COMPLETE"
+SUPPORTED_SHELLS: Final[tuple[str, ...]] = ("bash", "zsh", "fish")
+
 __all__ = [
     "APP_NAME",
     "APP_TAGLINE",
+    "COMPLETE_ENV_VAR",
     "DEFAULT_MAX_COMPLETION_TOKENS",
     "DEFAULT_MODEL",
     "DEFAULT_MODELS",
@@ -42,4 +47,5 @@ __all__ = [
     "ENV_MODEL",
     "ENV_TIMEOUT_SECONDS",
     "GROQ_BASE_URL",
+    "SUPPORTED_SHELLS",
 ]
