@@ -331,6 +331,24 @@ def show_setup_intro() -> None:
     )
 
 
+def show_chat_help() -> None:
+    """List the slash commands available inside an interactive chat."""
+    table = Table(
+        title="Chat commands",
+        title_style="brand",
+        header_style="brand.dim",
+        border_style="rule",
+        show_header=False,
+    )
+    table.add_column("Command", style="key", no_wrap=True)
+    table.add_column("What it does")
+    table.add_row("/help", "Show this list")
+    table.add_row("/history", "Show how many messages are in the conversation")
+    table.add_row("/reset", "Clear the conversation history")
+    table.add_row("/exit", "Leave the session")
+    console.print(table)
+
+
 def show_key_summary(api_key: str | None, source: str) -> None:
     """Render where the active API key comes from."""
     if api_key:
@@ -351,6 +369,7 @@ __all__ = [
     "show_banner",
     "show_batch",
     "show_benchmark",
+    "show_chat_help",
     "show_config",
     "show_dashboard",
     "show_error",
