@@ -10,6 +10,13 @@ from promptpilot.services import PromptPilotService
 from promptpilot.stores import StatsStore
 
 
+@pytest.fixture(autouse=True)
+def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Remove inherited Groq keys so tests never touch a real account."""
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    monkeypatch.delenv("PROMPTPILOT_DEMO_API_KEY", raising=False)
+
+
 @pytest.fixture
 def config_store(tmp_path: Path) -> ConfigStore:
     """Use an isolated JSON config for every test."""
@@ -17,9 +24,13 @@ def config_store(tmp_path: Path) -> ConfigStore:
 
 
 @pytest.fixture
-def service(tmp_path: Path) -> PromptPilotService:
+def stats_store(tmp_path: Path) -> StatsStore:
+    """Use an isolated JSONL statistics file for every test."""
+    return StatsStore(tmp_path / "stats.jsonl")
+
+
+@pytest.fixture
+def service(tmp_path: Path, config_store: ConfigStore, stats_store: StatsStore) -> PromptPilotService:
     """Build a service whose config and JSONL stats stay under pytest's temp path."""
-    config_path = tmp_path / "config.json"
-    store = ConfigStore(config_path)
-    store.save(AppConfig(model="test-model", demo_limit=10))
-    return PromptPilotService(store, StatsStore(tmp_path / "stats.jsonl"))
+    config_store.save(AppConfig(model="test-model", demo_limit=10))
+    return PromptPilotService(config_store, stats_store)
