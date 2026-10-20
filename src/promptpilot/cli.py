@@ -18,6 +18,7 @@ from promptpilot.exceptions import (
     MissingAPIKeyError,
     PromptPilotError,
 )
+from promptpilot.picker import pick_model, picker_available
 from promptpilot.schemas import ChatMessage
 from promptpilot.services import PromptPilotService
 from promptpilot.ui import (
@@ -308,15 +309,75 @@ def batch(
 
 
 @app.command("models")
-def models(ctx: typer.Context) -> None:
+def models(
+    ctx: typer.Context,
+    select: bool = typer.Option(
+        False, "--select", "-s", help="Pick a model interactively and save it."
+    ),
+) -> None:
     """List the live model catalog returned by Groq."""
     current = service()
     result: list = []
     _run(ctx, lambda: result.extend(current.list_models()))
+    if select:
+        _select_and_save(ctx, current, result)
+        return
     if wants_json(ctx):
         emit_json([item.model_dump() for item in result])
     else:
         show_models(result, active=current.config.model)
+
+
+@app.command("select-model")
+def select_model(ctx: typer.Context) -> None:
+    """Browse the live model catalog and save the one you choose."""
+    current = service()
+    result: list = []
+    _run(ctx, lambda: result.extend(current.list_models()))
+    _select_and_save(ctx, current, result)
+
+
+def _select_and_save(ctx: typer.Context, current: PromptPilotService, models_list: list) -> None:
+    """Open the picker and persist the chosen model."""
+    if picker_available():
+        chosen = pick_model(console, models_list, active=current.config.model)
+    else:
+        chosen = _select_with_prompt(models_list, current.config.model)
+
+    if chosen is None:
+        if wants_json(ctx):
+            emit_json({"selected": None, "cancelled": True})
+        else:
+            show_info("No model selected.")
+        return
+
+    _run(ctx, lambda: current.set_model(chosen))
+    if wants_json(ctx):
+        emit_json({"selected": chosen, "cancelled": False})
+    else:
+        show_success(f"Preferred model set to {chosen}.")
+
+
+def _select_with_prompt(models_list: list, active: str | None) -> str | None:
+    """Fall back to a numbered list when the terminal cannot provide raw input."""
+    if not models_list:
+        return None
+    console.print()
+    for index, model in enumerate(sorted(models_list, key=lambda item: item.id), start=1):
+        marker = " [dim](current)[/dim]" if model.id == active else ""
+        console.print(f"  [value]{index:>2}[/value]. {model.id}{marker}")
+    try:
+        answer = typer.prompt("Number", prompt_suffix=" > ", default="1")
+    except (EOFError, KeyboardInterrupt):
+        return None
+    try:
+        index = int(answer.strip())
+    except ValueError:
+        return None
+    ordered = sorted(models_list, key=lambda item: item.id)
+    if 1 <= index <= len(ordered):
+        return ordered[index - 1].id
+    return None
 
 
 @app.command()

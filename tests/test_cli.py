@@ -375,3 +375,54 @@ def test_color_flag_re_enables_colour(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert result.exit_code == 0
     assert ui.console.no_color is False
+
+
+def test_select_model_saves_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
+    monkeypatch.setattr(
+        "promptpilot.cli.pick_model",
+        lambda console, models, active=None: "openai/gpt-oss-120b",
+    )
+
+    result = runner.invoke(app, ["select-model"])
+
+    assert result.exit_code == 0
+    assert "openai/gpt-oss-120b" in result.output
+
+
+def test_select_model_reports_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
+    monkeypatch.setattr("promptpilot.cli.pick_model", lambda console, models, active=None: None)
+
+    result = runner.invoke(app, ["select-model"])
+
+    assert result.exit_code == 0
+    assert "No model selected" in result.output
+
+
+def test_select_model_json_mode_reports_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
+    monkeypatch.setattr(
+        "promptpilot.cli.pick_model",
+        lambda console, models, active=None: "openai/gpt-oss-120b",
+    )
+
+    result = runner.invoke(app, ["--json", "select-model"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["selected"] == "openai/gpt-oss-120b"
+    assert payload["cancelled"] is False
+
+
+def test_models_select_flag_opens_the_picker(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
+    monkeypatch.setattr(
+        "promptpilot.cli.pick_model",
+        lambda console, models, active=None: "openai/gpt-oss-120b",
+    )
+
+    result = runner.invoke(app, ["models", "--select"])
+
+    assert result.exit_code == 0
+    assert "openai/gpt-oss-120b" in result.output
