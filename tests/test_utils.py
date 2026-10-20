@@ -92,3 +92,24 @@ def test_terminal_width_never_goes_below_forty(monkeypatch: pytest.MonkeyPatch) 
 
 def test_format_latency_renders_milliseconds() -> None:
     assert format_latency(12.345) == "12.35 ms"
+
+
+def test_clean_prompt_returns_an_empty_string_for_blank_input() -> None:
+    assert clean_prompt("   \n\t  ") == ""
+
+
+def test_truncate_keeps_the_boundary_value_unchanged() -> None:
+    assert truncate("12345678", limit=8) == "12345678"
+
+
+def test_mask_secret_keeps_an_exactly_eight_character_key_hidden() -> None:
+    assert mask_secret("12345678") == "********"
+
+
+def test_compact_number_treats_negative_values_as_absolute() -> None:
+    assert compact_number(-1_500) == "-1.5K"
+
+
+def test_compact_number_rounds_whole_numbers_without_a_decimal() -> None:
+    assert compact_number(2_000_000_000) == "2.0B"
+    assert compact_number(0) == "0"
