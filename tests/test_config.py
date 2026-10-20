@@ -10,8 +10,8 @@ from promptpilot.exceptions import ConfigurationError
 from promptpilot.schemas import AppConfig
 
 
-def test_default_path_targets_a_per_user_directory() -> None:
-    path = ConfigStore.default_path()
+def test_default_path_targets_a_per_user_directory(real_default_path) -> None:
+    path = real_default_path()
 
     assert path.name == "config.json"
     assert path.parent.name == "promptpilot"

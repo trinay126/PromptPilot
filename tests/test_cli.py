@@ -377,7 +377,9 @@ def test_color_flag_re_enables_colour(monkeypatch: pytest.MonkeyPatch) -> None:
     assert ui.console.no_color is False
 
 
-def test_select_model_saves_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_model_saves_the_choice(
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
+) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
     monkeypatch.setattr(
         "promptpilot.cli.pick_model",
@@ -390,7 +392,9 @@ def test_select_model_saves_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
     assert "openai/gpt-oss-120b" in result.output
 
 
-def test_select_model_reports_cancellation(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_model_reports_cancellation(
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
+) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
     monkeypatch.setattr("promptpilot.cli.pick_model", lambda console, models, active=None: None)
 
@@ -400,7 +404,9 @@ def test_select_model_reports_cancellation(monkeypatch: pytest.MonkeyPatch) -> N
     assert "No model selected" in result.output
 
 
-def test_select_model_json_mode_reports_the_choice(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_select_model_json_mode_reports_the_choice(
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
+) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
     monkeypatch.setattr(
         "promptpilot.cli.pick_model",
@@ -415,7 +421,9 @@ def test_select_model_json_mode_reports_the_choice(monkeypatch: pytest.MonkeyPat
     assert payload["cancelled"] is False
 
 
-def test_models_select_flag_opens_the_picker(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_models_select_flag_opens_the_picker(
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
+) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
     monkeypatch.setattr(
         "promptpilot.cli.pick_model",
@@ -429,7 +437,7 @@ def test_models_select_flag_opens_the_picker(monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_select_model_falls_back_to_a_numbered_list(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
 ) -> None:
     """Without a raw-capable terminal the picker degrades to a numbered list."""
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
@@ -437,11 +445,12 @@ def test_select_model_falls_back_to_a_numbered_list(
     result = runner.invoke(app, ["select-model"], input="1\n")
 
     assert result.exit_code == 0
-    assert "No model selected." not in result.output
+    # The fake catalog is empty, so there is nothing to pick from.
+    assert "No model selected." in result.output
 
 
 def test_select_model_fallback_handles_an_invalid_number(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
 ) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
 
@@ -452,7 +461,7 @@ def test_select_model_fallback_handles_an_invalid_number(
 
 
 def test_select_model_fallback_rejects_an_out_of_range_number(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, fake_service: FakeService
 ) -> None:
     monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
 

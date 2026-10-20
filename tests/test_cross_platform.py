@@ -9,11 +9,13 @@ from promptpilot.config import ConfigStore
 from promptpilot.schemas import AppConfig
 
 
-def test_windows_config_path_uses_appdata(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_windows_config_path_uses_appdata(
+    monkeypatch: pytest.MonkeyPatch, real_default_path
+) -> None:
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setenv("APPDATA", r"C:\Users\trinay\AppData\Roaming")
 
-    path = ConfigStore.default_path()
+    path = real_default_path()
 
     assert path.name == "config.json"
     assert path.parent.name == "promptpilot"
@@ -21,30 +23,34 @@ def test_windows_config_path_uses_appdata(monkeypatch: pytest.MonkeyPatch) -> No
 
 
 def test_macos_config_path_uses_application_support(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, real_default_path
 ) -> None:
     monkeypatch.setattr(sys, "platform", "darwin")
 
-    path = ConfigStore.default_path()
+    path = real_default_path()
 
     assert path.parent.name == "promptpilot"
     assert "Application Support" in str(path)
 
 
-def test_linux_config_path_follows_xdg(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_linux_config_path_follows_xdg(
+    monkeypatch: pytest.MonkeyPatch, real_default_path
+) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.setenv("XDG_CONFIG_HOME", "/tmp/xdg-config")
 
-    path = ConfigStore.default_path()
+    path = real_default_path()
 
     assert path == Path("/tmp/xdg-config/promptpilot/config.json")
 
 
-def test_linux_config_path_defaults_to_dot_config(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_linux_config_path_defaults_to_dot_config(
+    monkeypatch: pytest.MonkeyPatch, real_default_path
+) -> None:
     monkeypatch.setattr(sys, "platform", "linux")
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
 
-    path = ConfigStore.default_path()
+    path = real_default_path()
 
     assert path.parent.parent.name == ".config"
     assert path.parent.name == "promptpilot"
