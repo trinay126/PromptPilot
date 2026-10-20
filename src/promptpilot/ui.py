@@ -11,15 +11,16 @@ from rich.panel import Panel
 from rich.table import Table
 
 from promptpilot.benchmark import BenchmarkSummary
+from promptpilot.constants import APP_NAME
 from promptpilot.schemas import ChatResponse, ModelInfo
-from promptpilot.utils import truncate
+from promptpilot.utils import format_latency, truncate
 from promptpilot.workers import WorkerResult
 
 console = Console()
 
 
 def show_banner() -> None:
-    console.print(Panel.fit("[bold cyan]PromptPilot[/bold cyan]\n[dim]Groq AI CLI[/dim]", border_style="cyan"))
+    console.print(Panel.fit(f"[bold cyan]{APP_NAME}[/bold cyan]\n[dim]Groq AI CLI[/dim]", border_style="cyan"))
 
 
 def emit_json(value: object) -> None:
@@ -89,11 +90,11 @@ def show_benchmark(results: list[BenchmarkSummary]) -> None:
         table.add_row(
             result.model,
             f"{result.successful}/{result.rounds}",
-            f"{result.average_ms:.2f} ms",
-            f"{result.median_ms:.2f} ms",
-            f"{result.p95_ms:.2f} ms",
-            f"{result.min_ms:.2f} ms",
-            f"{result.max_ms:.2f} ms",
+            format_latency(result.average_ms),
+            format_latency(result.median_ms),
+            format_latency(result.p95_ms),
+            format_latency(result.min_ms),
+            format_latency(result.max_ms),
         )
     console.print(table)
 
@@ -106,7 +107,7 @@ def show_workers(results: list[WorkerResult]) -> None:
         table.add_row(
             result.item,
             "[green]success[/green]" if result.error is None else "[red]error[/red]",
-            f"{result.elapsed_ms:.1f} ms",
+            format_latency(result.elapsed_ms),
             truncate(str(result.value if result.error is None else result.error), 80),
         )
     console.print(table)
@@ -132,3 +133,19 @@ def show_dashboard(data: dict[str, object]) -> None:
     for key, value in rows.items():
         table.add_row(str(key), str(value))
     console.print(table)
+
+
+__all__ = [
+    "ask_with_spinner",
+    "console",
+    "emit_json",
+    "response_dict",
+    "show_banner",
+    "show_batch",
+    "show_benchmark",
+    "show_dashboard",
+    "show_models",
+    "show_response",
+    "show_workers",
+    "stream_to_terminal",
+]
