@@ -4,4 +4,7 @@ from promptpilot.cli import main
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
+
+
+__all__ = ["main"]
