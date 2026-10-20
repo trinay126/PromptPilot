@@ -39,6 +39,13 @@ class StatsStore:
                     raise ValueError(f"invalid statistics at line {line_number}") from error
         return records
 
+    def recent(self, limit: int = 10) -> list[PromptStat]:
+        """Return the most recent records, newest last."""
+        if limit < 1:
+            raise ValueError("limit must be at least 1")
+        records = self.all()
+        return records[-limit:]
+
     def summary(self) -> dict[str, int | float | str]:
         """Return useful aggregate values for the dashboard."""
         records = self.all()
@@ -68,3 +75,6 @@ class StatsStore:
         with self._lock:
             if self.path.exists():
                 self.path.unlink()
+
+
+__all__ = ["StatsStore"]
