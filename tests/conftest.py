@@ -20,7 +20,10 @@ def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
-def isolated_config(tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> Path:
+def isolated_config(
+    tmp_path_factory: pytest.TempPathFactory,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Path:
     """Keep every test away from the real user configuration.
 
     Without this, a test that builds a service without injecting a config
