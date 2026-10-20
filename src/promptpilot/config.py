@@ -11,9 +11,11 @@ from dotenv import load_dotenv
 
 from promptpilot.constants import (
     APP_NAME,
-    DEFAULT_DEMO_LIMIT,
     DEFAULT_MODEL,
     DEFAULT_TIMEOUT_SECONDS,
+    ENV_API_KEY,
+    ENV_MODEL,
+    ENV_TIMEOUT_SECONDS,
 )
 from promptpilot.exceptions import ConfigurationError
 from promptpilot.schemas import AppConfig
@@ -65,28 +67,32 @@ class ConfigStore:
     @staticmethod
     def default_config() -> AppConfig:
         """Build a configuration from environment variables and defaults."""
-        raw_timeout = os.getenv("PROMPTPILOT_TIMEOUT_SECONDS", str(DEFAULT_TIMEOUT_SECONDS))
-        raw_limit = os.getenv("PROMPTPILOT_DEMO_LIMIT", str(DEFAULT_DEMO_LIMIT))
+        raw_timeout = os.getenv(ENV_TIMEOUT_SECONDS, str(DEFAULT_TIMEOUT_SECONDS))
         try:
             timeout = float(raw_timeout)
-            limit = int(raw_limit)
         except ValueError as error:
-            raise ConfigurationError("timeout and demo limit must be numeric") from error
+            raise ConfigurationError("timeout must be numeric") from error
         return AppConfig(
-            model=os.getenv("PROMPTPILOT_MODEL", DEFAULT_MODEL),
+            model=os.getenv(ENV_MODEL, DEFAULT_MODEL),
             timeout_seconds=timeout,
-            demo_limit=limit,
         )
 
     def user_api_key(self) -> str | None:
-        """Return a user key from the saved config or `GROQ_API_KEY`."""
+        """Return a user key from the saved config or the environment."""
         config = self.load()
-        return config.api_key or os.getenv("GROQ_API_KEY")
+        return config.api_key or os.getenv(ENV_API_KEY)
 
-    @staticmethod
-    def demo_api_key() -> str | None:
-        """Read the optional private-build demo key without persisting it."""
-        return os.getenv("PROMPTPILOT_DEMO_API_KEY")
+    def api_key_source(self) -> str:
+        """Describe where the active API key comes from."""
+        if self.load().api_key:
+            return "config file"
+        if os.getenv(ENV_API_KEY):
+            return f"environment ({ENV_API_KEY})"
+        return "not configured"
+
+    def has_api_key(self) -> bool:
+        """Report whether a usable API key is available."""
+        return bool(self.user_api_key())
 
 
 __all__ = ["ConfigStore"]
