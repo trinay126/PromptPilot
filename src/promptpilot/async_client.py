@@ -7,7 +7,12 @@ from collections.abc import Iterable
 
 import httpx
 
-from promptpilot.constants import GROQ_BASE_URL
+from promptpilot.constants import (
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_TEMPERATURE,
+    GROQ_BASE_URL,
+)
 from promptpilot.decorators import async_retry_on_api_error
 from promptpilot.exceptions import GroqAPIError, SchemaError
 from promptpilot.schemas import ChatMessage, ChatRequest, ChatResponse, ModelListResponse
@@ -43,6 +48,7 @@ class AsyncGroqApiClient:
         await self.close()
 
     async def close(self) -> None:
+        """Release the underlying HTTP connection pool."""
         await self._client.aclose()
 
     @async_retry_on_api_error(attempts=3)
@@ -72,11 +78,11 @@ class AsyncGroqApiClient:
         request = ChatRequest(
             model=model or self.model,
             messages=[
-                ChatMessage(role="system", content="You are PromptPilot, a helpful assistant."),
+                ChatMessage(role="system", content=DEFAULT_SYSTEM_PROMPT),
                 ChatMessage(role="user", content=prompt),
             ],
-            temperature=0.2,
-            max_completion_tokens=512,
+            temperature=DEFAULT_TEMPERATURE,
+            max_completion_tokens=DEFAULT_MAX_COMPLETION_TOKENS,
         )
         return await self.chat(request)
 
@@ -110,3 +116,6 @@ class AsyncGroqApiClient:
             return ModelListResponse.model_validate(response.json())
         except (ValueError, TypeError) as error:
             raise SchemaError("Groq returned an unexpected async models payload") from error
+
+
+__all__ = ["AsyncGroqApiClient"]
