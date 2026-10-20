@@ -63,7 +63,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **11** | **164** | **88%** | **0** |
+| **12** | **191** | **89%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | License |
 |:------------:|:----------:|:-------------:|:-------:|
@@ -107,8 +107,8 @@ adapter could reuse it without rewriting the Groq integration.
 - [Command cheat sheet](#command-cheat-sheet)
 - [Command reference](#command-reference)
   - [ask](#ask) · [chat](#chat) · [batch](#batch) · [models](#models)
-  - [dashboard](#dashboard) · [history](#history) · [benchmark](#benchmark) · [probe](#probe)
-  - [clear-stats](#clear-stats) · [completions](#completions) · [config](#config)
+  - [select-model](#select-model) · [dashboard](#dashboard) · [history](#history)
+  - [benchmark](#benchmark) · [probe](#probe) · [clear-stats](#clear-stats) · [completions](#completions) · [config](#config)
 - [Automation with `--json`](#automation-with---json)
 - [Configuration](#configuration)
 - [Under the hood](#under-the-hood)
@@ -162,6 +162,36 @@ you > ╭───────────────────────�
 ╰────────────────── 18 prompt + 142 completion = 160 total ──────────────────╯
 you > Bye.
 ```
+
+**`promptpilot select-model` — browse the live catalog and pick one interactively:**
+
+```text
+╭───────────────────────────────────── Select a model ─────────────────────────────────────╮
+│                                                                                          │
+│    Search: type to filter   10 shown                                                     │
+│    ↑/↓ move   enter select   esc cancel   backspace delete                               │
+│                                                                                          │
+│    Alibaba Cloud                                                                         │
+│  ▸   qwen/qwen3.8-27b                    current                                         │
+│    Canopy Labs                                                                           │
+│      canopylabs/orpheus-arabic-saudi                                                     │
+│      canopylabs/orpheus-v1-english                                                       │
+│    Meta                                                                                  │
+│      llama-3.1-8b-instant                                                                │
+│      llama-3.3-70b-versatile                                                             │
+│      meta-llama/llama-prompt-guard-2-22m                                                 │
+│      meta-llama/llama-prompt-guard-2-86m                                                 │
+│    OpenAI                                                                                │
+│      openai/gpt-oss-120b                                                                 │
+│      openai/gpt-oss-20b                                                                  │
+│      openai/gpt-oss-safeguard-20b                                                        │
+│                                                                                          │
+╰──────────────────────────────────────────────────────────────────────────────────────────╯
+```
+
+Type to filter as you go, move with `↑`/`↓`, confirm with `enter`, and cancel
+with `esc`. The chosen model is saved as your default and used by every
+subsequent command. Your current model is marked `current`.
 
 **`promptpilot ask --stream "..."` — tokens print the moment Groq emits them:**
 
@@ -511,6 +541,7 @@ promptpilot probe model-a model-b                  # thread pool
 
 # discovery
 promptpilot models                                 # live catalog
+promptpilot select-model                           # interactive picker
 promptpilot benchmark -m model-a -m model-b --rounds 3
 
 # local state
@@ -646,6 +677,32 @@ marked with `*`.
 ```bash
 promptpilot models
 ```
+
+### `select-model`
+
+Browse the live model catalog in an interactive picker and save the one you
+choose as your default.
+
+```bash
+promptpilot select-model
+promptpilot models --select      # the same picker, from the models command
+```
+
+| Key | Action |
+|---|---|
+| any printable character | Filter the list as you type |
+| `↑` / `↓` | Move the selection |
+| `enter` | Save the highlighted model |
+| `esc` | Cancel without changing anything |
+| `backspace` | Delete a character from the search |
+
+The catalog is grouped by owner, and your current model is marked `current`.
+Because the filter matches on the model id, you can type a fragment such as
+`gpt` or `llama` to narrow the list instantly.
+
+If the terminal cannot provide raw input — a pipe, a CI job, or a Windows
+console — the command falls back to a numbered list you can pick from by
+typing a number.
 
 ### `dashboard`
 
@@ -925,6 +982,7 @@ PromptPilot/
 │   ├── services.py                # PromptPilotService — the application facade
 │   ├── clients.py                 # sync REST client + SSE streaming
 │   ├── async_client.py            # async REST client + gather batching
+│   ├── picker.py                  # interactive model picker (search + groups)
 │   ├── benchmark.py               # latency benchmark primitives
 │   ├── workers.py                 # thread-pool utilities
 │   ├── config.py                  # JSON config + cross-platform paths
@@ -934,7 +992,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 164 tests, no network, no API key
+├── tests/                         # 191 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -947,6 +1005,7 @@ PromptPilot/
 │   ├── test_workers.py            # thread pool
 │   ├── test_benchmark.py          # latency aggregation
 │   ├── test_service.py            # application rules
+│   ├── test_picker.py             # grouping, filtering, and key handling
 │   ├── test_cli.py                # command dispatch and JSON output
 │   ├── test_chat.py               # interactive session
 │   └── test_ui.py                 # presentation layer
@@ -978,8 +1037,8 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-164 passed
-88% coverage
+191 passed
+89% coverage
 ruff: all checks passed
 ```
 

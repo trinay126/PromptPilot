@@ -426,3 +426,37 @@ def test_models_select_flag_opens_the_picker(monkeypatch: pytest.MonkeyPatch) ->
 
     assert result.exit_code == 0
     assert "openai/gpt-oss-120b" in result.output
+
+
+def test_select_model_falls_back_to_a_numbered_list(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Without a raw-capable terminal the picker degrades to a numbered list."""
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
+
+    result = runner.invoke(app, ["select-model"], input="1\n")
+
+    assert result.exit_code == 0
+    assert "No model selected." not in result.output
+
+
+def test_select_model_fallback_handles_an_invalid_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
+
+    result = runner.invoke(app, ["select-model"], input="not-a-number\n")
+
+    assert result.exit_code == 0
+    assert "No model selected." in result.output
+
+
+def test_select_model_fallback_rejects_an_out_of_range_number(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: False)
+
+    result = runner.invoke(app, ["select-model"], input="999\n")
+
+    assert result.exit_code == 0
+    assert "No model selected." in result.output

@@ -72,3 +72,191 @@ def test_filter_models_returns_nothing_for_a_non_match() -> None:
     groups = group_by_owner(models())
 
     assert filter_models(groups, "definitely-not-a-model") == []
+
+
+def test_render_shows_every_group_and_the_current_model() -> None:
+    from promptpilot.picker import _render
+
+    groups = group_by_owner(models())
+    visible = filter_models(groups, "")
+    panel = _render(groups, visible, 0, "", "openai/gpt-oss-20b")
+
+    rendered = _flatten(panel)
+    assert "Alibaba Cloud" in rendered
+    assert "OpenAI" in rendered
+    assert "qwen/qwen3.8-27b" in rendered
+    assert "current" in rendered
+
+
+def test_render_reports_when_nothing_matches() -> None:
+    from promptpilot.picker import _render
+
+    groups = group_by_owner(models())
+    panel = _render(groups, [], 0, "zzz", None)
+
+    assert "No model matches" in _flatten(panel)
+
+
+def test_read_key_decodes_plain_characters(tmp_path) -> None:
+    import os
+
+    from promptpilot.picker import _read_key
+
+    path = tmp_path / "keys"
+    path.write_bytes(b"x")
+    fd = os.open(path, os.O_RDONLY)
+
+    try:
+        assert _read_key(fd) == "x"
+    finally:
+        os.close(fd)
+
+
+def test_read_key_decodes_arrow_keys(tmp_path) -> None:
+    import os
+
+    from promptpilot.picker import _read_key
+
+    path = tmp_path / "keys"
+    path.write_bytes(b"\x1b[A")
+    fd = os.open(path, os.O_RDONLY)
+
+    try:
+        assert _read_key(fd) == "up"
+    finally:
+        os.close(fd)
+
+
+def test_read_key_decodes_backspace_and_enter(tmp_path) -> None:
+    import os
+
+    from promptpilot.picker import _read_key
+
+    path = tmp_path / "keys"
+    path.write_bytes(b"\x7f")
+    fd = os.open(path, os.O_RDONLY)
+    try:
+        assert _read_key(fd) == "backspace"
+    finally:
+        os.close(fd)
+
+    path2 = tmp_path / "keys2"
+    path2.write_bytes(b"\r")
+    fd2 = os.open(path2, os.O_RDONLY)
+    try:
+        assert _read_key(fd2) == "enter"
+    finally:
+        os.close(fd2)
+
+
+def test_read_key_raises_on_ctrl_c(tmp_path) -> None:
+    import os
+
+    import pytest
+
+    from promptpilot.picker import _read_key
+
+    path = tmp_path / "keys"
+    path.write_bytes(b"\x03")
+    fd = os.open(path, os.O_RDONLY)
+
+    try:
+        with pytest.raises(KeyboardInterrupt):
+            _read_key(fd)
+    finally:
+        os.close(fd)
+
+
+def test_picker_available_is_false_without_a_terminal() -> None:
+    from promptpilot.picker import picker_available
+
+    assert picker_available() is False
+
+
+def _flatten(panel) -> str:
+    """Render a panel to plain text for assertions."""
+    from rich.console import Console
+
+    console = Console(width=120, force_terminal=False)
+    with console.capture() as capture:
+        console.print(panel)
+    return capture.get()
+
+
+class _FakeStdin:
+    """Minimal stdin double that claims to be a terminal."""
+
+    def isatty(self) -> bool:
+        return True
+
+    def fileno(self) -> int:
+        return 0
+
+
+def _drive_picker(monkeypatch, keys, models_list):
+    """Run the picker with a scripted key sequence."""
+    import io
+    import termios
+    import tty
+
+    from rich.console import Console
+
+    from promptpilot import picker
+
+    pending = list(keys)
+    monkeypatch.setattr(picker, "_read_key", lambda fd: pending.pop(0))
+    monkeypatch.setattr(picker.sys, "stdin", _FakeStdin())
+    monkeypatch.setattr(termios, "tcgetattr", lambda fd: [0, 0, 0, 0, 0, 0])
+    monkeypatch.setattr(termios, "tcsetattr", lambda fd, when, attr: None)
+    monkeypatch.setattr(tty, "setraw", lambda fd: None)
+
+    console = Console(file=io.StringIO(), force_terminal=False, width=100)
+    return picker.pick_model(console, models_list, active=None)
+
+
+def test_pick_model_returns_the_highlighted_model(monkeypatch) -> None:
+    """The picker returns the model under the cursor when enter is pressed."""
+    chosen = _drive_picker(monkeypatch, ["down", "enter"], models())
+
+    # Groups are ordered by owner, so index 1 is the Canopy Labs model.
+    assert chosen == "canopylabs/orpheus-v1-english"
+
+
+def test_pick_model_returns_none_when_cancelled(monkeypatch) -> None:
+    assert _drive_picker(monkeypatch, ["escape"], models()) is None
+
+
+def test_pick_model_filters_as_you_type(monkeypatch) -> None:
+    chosen = _drive_picker(monkeypatch, ["g", "p", "t", "enter"], models())
+
+    assert chosen == "openai/gpt-oss-120b"
+
+
+def test_pick_model_backspace_widens_the_filter(monkeypatch) -> None:
+    chosen = _drive_picker(monkeypatch, ["g", "p", "t", "backspace", "enter"], models())
+
+    assert chosen == "openai/gpt-oss-120b"
+
+
+def test_pick_model_wraps_around_the_list(monkeypatch) -> None:
+    chosen = _drive_picker(monkeypatch, ["up", "enter"], models())
+
+    # Moving up from the first item wraps around to the last one.
+    assert chosen == "openai/gpt-oss-20b"
+
+
+def test_pick_model_returns_none_without_a_terminal(monkeypatch) -> None:
+    from promptpilot import picker
+
+    class _NoTty:
+        def isatty(self) -> bool:
+            return False
+
+    monkeypatch.setattr(picker.sys, "stdin", _NoTty())
+
+    import io
+
+    from rich.console import Console
+
+    console = Console(file=io.StringIO(), force_terminal=False, width=100)
+    assert picker.pick_model(console, models(), active=None) is None
