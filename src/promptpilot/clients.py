@@ -7,7 +7,12 @@ from collections.abc import Callable, Iterable, Iterator
 
 import httpx
 
-from promptpilot.constants import GROQ_BASE_URL
+from promptpilot.constants import (
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_SYSTEM_PROMPT,
+    DEFAULT_TEMPERATURE,
+    GROQ_BASE_URL,
+)
 from promptpilot.decorators import retry_on_api_error, timed
 from promptpilot.exceptions import GroqAPIError, SchemaError
 from promptpilot.schemas import ChatMessage, ChatRequest, ChatResponse, ModelListResponse
@@ -37,6 +42,7 @@ class GroqApiClient:
         )
 
     def close(self) -> None:
+        """Release the underlying HTTP connection pool."""
         self._client.close()
 
     def __enter__(self) -> "GroqApiClient":
@@ -75,9 +81,9 @@ class GroqApiClient:
         self,
         prompt: str,
         model: str | None = None,
-        system: str = "You are PromptPilot, a concise and helpful assistant.",
-        temperature: float = 0.2,
-        max_completion_tokens: int = 512,
+        system: str = DEFAULT_SYSTEM_PROMPT,
+        temperature: float = DEFAULT_TEMPERATURE,
+        max_completion_tokens: int = DEFAULT_MAX_COMPLETION_TOKENS,
         stream: bool = False,
     ) -> ChatRequest:
         return ChatRequest(
@@ -162,3 +168,6 @@ class GroqApiClient:
     ) -> list[ChatResponse]:
         """Educational baseline used to compare with async gather."""
         return [self.ask(prompt, model=model) for prompt in prompts]
+
+
+__all__ = ["GroqApiClient"]
