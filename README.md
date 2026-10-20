@@ -1,5 +1,14 @@
 <div align="center">
 
+<pre>
+    ____                             __  ____  _ __      __
+   / __ \_________  ____ ___  ____  / /_/ __ \(_) /___  / /_
+  / /_/ / ___/ __ \/ __ `__ \/ __ \/ __/ /_/ / / / __ \/ __/
+ / ____/ /  / /_/ / / / / / / /_/ / /_/ ____/ / / /_/ / /_
+/_/   /_/   \____/_/ /_/ /_/ .___/\__/_/   /_/_/\____/\__/
+                          /_/
+</pre>
+
 # PromptPilot
 
 **A production-minded Groq AI command-line workbench.**
@@ -14,9 +23,21 @@ UI and backed by a fully typed, fully tested service layer.
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
 [![Typed](https://img.shields.io/badge/typing-annotated-2A6DB2?logo=python&logoColor=white)](src/promptpilot/schemas.py)
 
-[Quick start](#quick-start) · [Commands](#command-reference) · [Configuration](#configuration) · [Architecture](#architecture)
+[Install](#quick-start) &nbsp;·&nbsp; [Commands](#command-reference) &nbsp;·&nbsp; [Configure](#configuration) &nbsp;·&nbsp; [Architecture](#architecture) &nbsp;·&nbsp; [Develop](#development)
 
 </div>
+
+---
+
+## At a glance
+
+| Commands | Tests | Coverage | Keys bundled |
+|:--------:|:-----:|:--------:|:------------:|
+| **10** | **156** | **88%** | **0** |
+
+| Runtime deps | Test suite | Network in CI | License |
+|:------------:|:----------:|:-------------:|:-------:|
+| **5** | **~1 second** | **0 calls** | **MIT** |
 
 ---
 
@@ -25,49 +46,55 @@ UI and backed by a fully typed, fully tested service layer.
 Most "AI CLI" projects are a thin wrapper around a chat endpoint. PromptPilot is
 built like production software instead: a typed API-client layer, a validated
 service boundary, persistent local state, a real error model, and a test suite
-that mocks the HTTP transport so it never needs a key or spends quota.
+that mocks the HTTP transport so it never needs a key or spends anyone's quota.
 
 It is deliberately a **CLI, not a FastAPI server**. A CLI does not need to
 expose an HTTP endpoint of its own — it is already the client. PromptPilot
 speaks HTTPS to Groq directly through `httpx`, so every layer of the request
-(status codes, headers, timeouts, retries, JSON validation) is visible and
+(status codes, headers, timeouts, retries, JSON validation) stays visible and
 explainable. The service layer is deliberately shaped so a future FastAPI
 adapter could reuse it without rewriting the Groq integration.
 
 | Capability | Why it matters |
 |---|---|
-| **Zero-configuration onboarding** | One guided command stores your key. No bundled key, no demo allowance — you always authenticate as yourself. |
+| **Zero-configuration onboarding** | One guided command stores your key. No bundled key and no demo allowance — you always authenticate as yourself. |
 | **Real streaming** | Server-Sent Events are parsed at the wire level, so tokens render the moment Groq produces them. |
 | **Interactive chat** | A REPL that sends earlier turns back as context, with `/help`, `/history`, `/reset`, and `/exit`. |
 | **Automation-first** | A global `--json` flag turns every command into a clean JSON document for `jq`, CI, and shell pipelines. |
 | **Honest benchmarks** | Average, median, P95, min, and max latency per model, with the fastest one called out. |
-| **Zero-dependency tests** | `respx` mocks the HTTPX transport, so the suite runs offline, for free, in under a second. |
+| **Zero-dependency tests** | `respx` mocks the HTTPX transport, so the suite runs offline, for free, in about a second. |
 
 ---
 
 ## Table of contents
 
+- [At a glance](#at-a-glance)
 - [Why PromptPilot](#why-promptpilot)
 - [Screenshots](#screenshots)
+- [Requirements](#requirements)
 - [Quick start](#quick-start)
+- [Command cheat sheet](#command-cheat-sheet)
 - [Command reference](#command-reference)
-  - [ask](#ask) · [chat](#chat) · [batch](#batch) · [models](#models)
-  - [dashboard](#dashboard) · [history](#history) · [benchmark](#benchmark) · [probe](#probe)
-  - [clear-stats](#clear-stats) · [config](#config)
 - [Automation with `--json`](#automation-with---json)
 - [Configuration](#configuration)
+- [Under the hood](#under-the-hood)
 - [Architecture](#architecture)
 - [Project layout](#project-layout)
 - [Development](#development)
 - [Windows executable](#windows-executable)
+- [Troubleshooting](#troubleshooting)
+- [FAQ](#faq)
 - [Security model](#security-model)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
 
 ## Screenshots
 
-**A rendered answer, with token accounting in the footer:**
+Every capture below is real terminal output.
+
+**`promptpilot ask "..."` — answers are rendered as Markdown, with token accounting in the footer:**
 
 ```text
 ╭────────────────────────────── llama-3.1-8b-instant ──────────────────────────────╮
@@ -98,7 +125,7 @@ adapter could reuse it without rewriting the Groq integration.
 ╰───────────────────── 18 prompt + 142 completion = 160 total ─────────────────────╯
 ```
 
-**Live streaming, token by token:**
+**`promptpilot ask --stream "..."` — tokens print the moment Groq emits them:**
 
 ```text
 llama-3.1-8b-instant
@@ -106,7 +133,7 @@ llama-3.1-8b-instant
 Caching turns a slow query into a fast one.
 ```
 
-**The live model catalog, with your active model marked:**
+**`promptpilot models` — the live catalog, with your active model marked:**
 
 ```text
          Available Groq models
@@ -120,7 +147,7 @@ Caching turns a slow query into a fast one.
 * active model   llama-3.1-8b-instant
 ```
 
-**The local dashboard:**
+**`promptpilot dashboard` — configuration and local usage in one view:**
 
 ```text
                           PromptPilot dashboard
@@ -138,7 +165,7 @@ Caching turns a slow query into a fast one.
 └─────────────────────┴─────────────────────────────────────────────────┘
 ```
 
-**A latency benchmark across models:**
+**`promptpilot benchmark` — end-to-end latency compared across models:**
 
 ```text
                                 Groq model benchmark
@@ -151,7 +178,7 @@ Caching turns a slow query into a fast one.
 Fastest: llama-3.3-70b-versatile
 ```
 
-**A friendly error, instead of a traceback:**
+**An error is a panel with a next step — never a traceback:**
 
 ```text
 ╭─────────────────────────────────── Error ────────────────────────────────────╮
@@ -165,9 +192,22 @@ Fastest: llama-3.3-70b-versatile
 
 ---
 
+## Requirements
+
+| | |
+|---|---|
+| **Python** | 3.11 or newer (uses PEP 604 union syntax, `datetime.UTC`, `ParamSpec`) |
+| **A Groq account** | A free key from [console.groq.com/keys](https://console.groq.com/keys) |
+| **OS** | Linux, macOS, or Windows — configuration paths adapt per platform |
+
+Runtime dependencies: `httpx`, `pydantic`, `python-dotenv`, `rich`, `typer`.
+That is the whole list.
+
+---
+
 ## Quick start
 
-**1. Install**
+**1 — Install**
 
 ```bash
 git clone https://github.com/trinay126/PromptPilot.git
@@ -178,7 +218,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-**2. Add your key**
+**2 — Add your key**
 
 Create a free key at [console.groq.com/keys](https://console.groq.com/keys), then:
 
@@ -186,11 +226,11 @@ Create a free key at [console.groq.com/keys](https://console.groq.com/keys), the
 promptpilot config set-key
 ```
 
-The key is stored in your user config directory and is never written to the
-repository. You can also export `GROQ_API_KEY` instead — PromptPilot prefers a
-saved key and falls back to the environment.
+The prompt hides what you type. The key is written to your user config
+directory and is never committed to the repository. Exporting `GROQ_API_KEY`
+works too — PromptPilot prefers a saved key and falls back to the environment.
 
-**3. Say something**
+**3 — Say something**
 
 ```bash
 promptpilot ask "Explain Python decorators in one paragraph."
@@ -199,6 +239,42 @@ promptpilot ask "Explain Python decorators in one paragraph."
 > **Note** — PromptPilot uses **your own** API key. There is no bundled key and
 > no demo allowance, so nothing you run is metered against someone else's
 > account.
+
+---
+
+## Command cheat sheet
+
+```bash
+# one-shot
+promptpilot ask "your prompt"
+promptpilot ask --stream "your prompt"            # live token stream
+promptpilot ask -m llama-3.3-70b-versatile "..."   # pick a model
+
+# conversation
+promptpilot chat                                   # multi-turn REPL
+
+# concurrency
+promptpilot batch "prompt one" "prompt two"        # asyncio.gather
+promptpilot probe model-a model-b                  # thread pool
+
+# discovery
+promptpilot models                                 # live catalog
+promptpilot benchmark -m model-a -m model-b --rounds 3
+
+# local state
+promptpilot dashboard                              # config + usage
+promptpilot history --limit 25                     # recent prompts
+promptpilot clear-stats                            # wipe history
+
+# configuration
+promptpilot config set-key
+promptpilot config set-model llama-3.3-70b-versatile
+promptpilot config show
+promptpilot config path
+
+# automation
+promptpilot --json dashboard | jq .stats
+```
 
 ---
 
@@ -249,8 +325,8 @@ promptpilot ask --stream "Write a haiku about caching"
 | `--model`, `-m` | your configured model | Model to use for this request |
 | `--stream` / `--no-stream` | `--no-stream` | Print SSE deltas the moment they arrive |
 
-Answers are rendered as **Markdown**, so code blocks, lists, and tables from
-the model come back formatted rather than as raw text.
+Answers are rendered as **Markdown**, so code blocks, lists, and tables coming
+back from the model arrive formatted rather than as raw text.
 
 ### `chat`
 
@@ -275,6 +351,9 @@ you > /exit
 | `/history` | Show how many messages are in the conversation |
 | `/reset` | Clear the conversation history |
 | `/exit` | Leave the session |
+
+The session keeps the last 20 messages as context, so long conversations stay
+cheap and focused.
 
 ### `batch`
 
@@ -309,7 +388,7 @@ promptpilot dashboard
 ### `history`
 
 Show the prompts you have run on this machine, newest last, with latency and
-status. The record is stored in `stats.jsonl`.
+status. Records live in `stats.jsonl`.
 
 ```bash
 promptpilot history
@@ -419,8 +498,8 @@ Errors are reported as JSON too, and always exit with status `1`:
 
 ## Configuration
 
-PromptPilot resolves settings in this order: **saved config file** → **environment
-variable** → **built-in default**.
+PromptPilot resolves settings in this order: **saved config file** →
+**environment variable** → **built-in default**.
 
 | Variable | Purpose | Default |
 |---|---|---|
@@ -450,6 +529,53 @@ it automatically.
 **Statistics file** — `stats.jsonl` sits next to the config file and holds one
 validated JSON object per request. This is what `dashboard` and `history` read.
 
+```json
+{"timestamp":"2026-10-20T16:56:11.482Z","model":"llama-3.1-8b-instant","prompt_chars":42,"response_chars":512,"prompt_tokens":18,"completion_tokens":142,"latency_ms":56.34,"prompt_preview":"Explain Python decorators in one paragraph.","success":true}
+```
+
+---
+
+## Under the hood
+
+What actually happens between `promptpilot ask "..."` and the answer on your
+screen:
+
+```text
+  promptpilot ask "..."
+          │
+          ▼
+  ① clean_prompt()          strip ANSI escapes, collapse whitespace
+          │
+          ▼
+  ② resolve the key         saved config → GROQ_API_KEY → MissingAPIKeyError
+          │
+          ▼
+  ③ ChatRequest             Pydantic validates model, messages, temperature, budget
+          │
+          ▼
+  ④ POST /chat/completions  httpx.Client, Bearer auth, 45 s timeout
+          │
+          ├── 408/429/5xx ──▶ retry with linear backoff (3 attempts)
+          │
+          ▼
+  ⑤ ChatResponse            Pydantic validates the reply, or SchemaError
+          │
+          ▼
+  ⑥ PromptStat              one JSONL record appended to stats.jsonl
+          │
+          ▼
+  ⑦ render                  Markdown panel + token footer
+```
+
+Two details worth calling out:
+
+- **Retries are bounded and selective.** Only transient statuses (408, 429,
+  500, 502, 503, 504) are retried, with linear backoff. A `401` fails fast
+  because retrying a bad key never helps.
+- **The connection is always closed.** Streaming responses are consumed inside a
+  `with` block, so the socket is released even if parsing raises or you hit
+  `Ctrl-C` mid-answer.
+
 ---
 
 ## Architecture
@@ -463,7 +589,7 @@ validated JSON object per request. This is what `dashboard` and `history` read.
                        ┌──────────────▼───────────────┐
                        │       services.py             │  application rules
                        │  PromptPilotService           │  (key resolution,
-                       │                               │   stats, quotas-free)
+                       │                               │   stats, orchestration)
                        └───┬───────────────────────┬───┘
                            │                       │
             ┌──────────────▼─────────┐   ┌─────────▼─────────┐
@@ -598,6 +724,93 @@ request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
 
 ---
 
+## Troubleshooting
+
+<details>
+<summary><strong>The CLI says "No Groq API key found"</strong></summary>
+
+You have not stored a key yet. Run `promptpilot config set-key`, or export
+`GROQ_API_KEY` in your shell. `promptpilot config show` shows which source is
+currently active.
+</details>
+
+<details>
+<summary><strong>My key is rejected with HTTP 401</strong></summary>
+
+The key was sent but Groq did not accept it. It may be revoked, truncated, or
+from a different account. Re-store it with `promptpilot config set-key`. The
+key is masked everywhere PromptPilot displays it, so check for a stray space
+by re-entering it.
+</details>
+
+<details>
+<summary><strong>I get HTTP 429</strong></summary>
+
+You are being rate limited by Groq. Wait a moment and retry. PromptPilot
+already retries `429` responses three times with linear backoff, so a
+persistent `429` means the account itself is over its limit.
+</details>
+
+<details>
+<summary><strong>A model returns "not found"</strong></summary>
+
+Model IDs are account-specific and change over time. Run `promptpilot models`
+to see the live catalog for your key, and use the exact ID.
+</details>
+
+<details>
+<summary><strong>My statistics look empty</strong></summary>
+
+Statistics are local and per-machine. They are written to `stats.jsonl` next
+to your config file — run `promptpilot config path` to find it. If you have
+never run a prompt, the file will not exist yet. `promptpilot clear-stats`
+deletes it.
+</details>
+
+<details>
+<summary><strong>How do I start completely fresh?</strong></summary>
+
+```bash
+promptpilot clear-stats
+rm -f "$(promptpilot --json config path | jq -r .config_path)"
+```
+
+</details>
+
+---
+
+## FAQ
+
+**Do I need a paid Groq plan?**
+No. The Groq free tier is enough for everything in this README.
+
+**Is my key ever sent anywhere except Groq?**
+No. It travels only in the `Authorization` header of requests to
+`api.groq.com`. It is never logged, never printed unmasked, and never
+committed.
+
+**Does the test suite call the real API?**
+Never. `respx` mocks the HTTPX transport, so the suite runs fully offline in
+about a second.
+
+**Why not use the official `groq` SDK?**
+Because the point of this project is to show the HTTP layer directly — status
+codes, headers, timeouts, retries, and SSE parsing are all visible. The
+service layer is shaped so swapping in the SDK later would be a one-file
+change.
+
+**Can I use this without a Groq key?**
+You can install it, run the tests, and explore `promptpilot --help`,
+`promptpilot config show`, and `promptpilot dashboard`. Anything that talks to
+Groq needs a key.
+
+**Why does `benchmark` show a "Fastest" line?**
+With several models, the table alone makes you do the arithmetic. The summary
+line names the winner directly — but remember the numbers reflect one moment
+on one network, not a permanent ranking.
+
+---
+
 ## Security model
 
 - **Your key never leaves your machine** except in the `Authorization` header
@@ -608,6 +821,21 @@ request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
 - `.env` and `.env.*` are git-ignored, and only `.env.example` is tracked.
 - A key stored in the config file is written with the same permissions as the
   rest of your user config directory.
+
+---
+
+## Contributing
+
+Contributions are welcome. The workflow is deliberately small:
+
+1. Open an issue describing the change, so the design can be discussed first.
+2. Create a branch: `git checkout -b feature/short-description`
+3. Keep the suite green: `python -m pytest` and `ruff check src tests`
+4. Add tests for anything you change — the suite is fast and does not need a key
+5. Open a pull request describing what changed and why
+
+Please keep the five runtime dependencies as they are. Adding a dependency is
+a design decision, not an implementation detail.
 
 ---
 
