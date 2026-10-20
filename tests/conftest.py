@@ -14,7 +14,6 @@ from promptpilot.stores import StatsStore
 def clean_environment(monkeypatch: pytest.MonkeyPatch) -> None:
     """Remove inherited Groq keys so tests never touch a real account."""
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("PROMPTPILOT_DEMO_API_KEY", raising=False)
 
 
 @pytest.fixture
@@ -34,5 +33,5 @@ def service(
     tmp_path: Path, config_store: ConfigStore, stats_store: StatsStore
 ) -> PromptPilotService:
     """Build a service whose config and JSONL stats stay under pytest's temp path."""
-    config_store.save(AppConfig(model="test-model", demo_limit=10))
+    config_store.save(AppConfig(model="test-model"))
     return PromptPilotService(config_store, stats_store)

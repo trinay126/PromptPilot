@@ -14,7 +14,6 @@ def test_stats_store_round_trip(tmp_path: Path) -> None:
             prompt_chars=5,
             response_chars=10,
             latency_ms=25.5,
-            source="user",
         )
     )
 
@@ -32,7 +31,6 @@ def test_clear_removes_file(tmp_path: Path) -> None:
             prompt_chars=1,
             response_chars=1,
             latency_ms=1,
-            source="demo",
         )
     )
     store.clear()
@@ -64,7 +62,6 @@ def test_summary_aggregates_multiple_records(tmp_path: Path) -> None:
             prompt_tokens=2,
             completion_tokens=3,
             latency_ms=10.0,
-            source="user",
         )
     )
     store.record(
@@ -75,7 +72,6 @@ def test_summary_aggregates_multiple_records(tmp_path: Path) -> None:
             prompt_tokens=4,
             completion_tokens=6,
             latency_ms=30.0,
-            source="demo",
             success=False,
         )
     )
@@ -100,8 +96,7 @@ def test_recent_returns_the_tail_of_the_history(tmp_path: Path) -> None:
                 prompt_chars=1,
                 response_chars=1,
                 latency_ms=1.0,
-                source="user",
-            )
+                )
         )
 
     recent = store.recent(limit=2)

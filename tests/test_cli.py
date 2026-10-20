@@ -130,9 +130,6 @@ class FakeService:
     def set_model(self, model: str) -> None:
         self.saved_model = model
 
-    def reset_demo(self) -> None:
-        self.was_reset = True
-
     def clear_stats(self) -> None:
         self.was_cleared = True
 
