@@ -2,7 +2,9 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 build/
 dist/
@@ -15,3 +17,4 @@ artifacts/
 .idea/
 .vscode/
 .DS_Store
+Thumbs.db
