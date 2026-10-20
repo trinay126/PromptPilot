@@ -1,4 +1,5 @@
 """Thread-safe ten-prompt demo quota."""
+
 from __future__ import annotations
 
 from threading import Lock
@@ -6,7 +7,8 @@ from threading import Lock
 from promptpilot.exceptions import QuotaExceededError
 from promptpilot.schemas import AppConfig
 
-class QuotaManger:
+
+class QuotaManager:
     """Manage successful demo prompts without charging user-owned keys."""
 
     def __init__(self, config: AppConfig, save_config) -> None:
@@ -34,7 +36,7 @@ class QuotaManger:
         with self._lock:
             if not self.can_use_demo():
                 raise QuotaExceededError(
-                    "The ten-prompt demo allowance is finishes. configure your own Groq key."
+                    "The ten-prompt demo allowance is finished. Configure your own Groq key."
                 )
             self._config.demo_prompts_used += 1
             self._save_config(self._config)
@@ -46,7 +48,5 @@ class QuotaManger:
             self._save_config(self._config)
 
     def summary(self) -> dict[str, int]:
-        """Return dashboard friendly quota data."""
+        """Return dashboard-friendly quota data."""
         return {"limit": self.limit, "used": self.used, "remaining": self.remaining}
-
-    
