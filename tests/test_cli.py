@@ -1,6 +1,7 @@
 """Tests for the Typer command-line interface."""
 
 import json
+import sys
 from pathlib import Path
 
 import pytest
@@ -239,6 +240,10 @@ def test_config_set_key_saves_the_key(fake_service: FakeService) -> None:
     assert fake_service.saved_key == "gsk_live_key_value"
 
 
+@pytest.mark.skipif(
+    sys.platform == "win32",
+    reason="On Windows, getpass reads from the console rather than stdin.",
+)
 def test_config_set_key_can_prompt_for_the_key(fake_service: FakeService) -> None:
     result = runner.invoke(app, ["config", "set-key"], input="gsk_live_key_value\n")
 
