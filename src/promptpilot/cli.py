@@ -6,6 +6,9 @@ from dataclasses import asdict
 
 import typer
 
+from promptpilot import __version__
+from promptpilot.benchmark import fastest_summary
+from promptpilot.constants import APP_NAME
 from promptpilot.exceptions import PromptPilotError
 from promptpilot.services import PromptPilotService
 from promptpilot.ui import (
@@ -25,10 +28,24 @@ from promptpilot.ui import (
 app = typer.Typer(name="promptpilot", help="A Groq AI command-line workbench.", no_args_is_help=True, add_completion=False)
 
 
+def _version_callback(value: bool) -> None:
+    """Print the installed version and exit."""
+    if value:
+        console.print(f"[bold cyan]{APP_NAME}[/bold cyan] {__version__}")
+        raise typer.Exit()
+
+
 @app.callback()
 def root(
     ctx: typer.Context,
     json_output: bool = typer.Option(False, "--json", help="Emit one JSON document for automation."),
+    version: bool = typer.Option(
+        None,
+        "--version",
+        callback=_version_callback,
+        is_eager=True,
+        help="Show the installed version and exit.",
+    ),
 ) -> None:
     ctx.ensure_object(dict)
     ctx.obj["json"] = json_output
@@ -40,6 +57,15 @@ def wants_json(ctx: typer.Context) -> bool:
 
 def service() -> PromptPilotService:
     return PromptPilotService()
+
+
+def _fail(ctx: typer.Context, error: Exception) -> None:
+    """Report an error in the format the caller asked for."""
+    if wants_json(ctx):
+        emit_json({"error": str(error), "type": type(error).__name__})
+    else:
+        console.print(f"[bold red]Error:[/bold red] {error}")
+    raise typer.Exit(code=1) from error
 
 
 @app.command()
@@ -62,11 +88,7 @@ def ask(
         response = ask_with_spinner(current, prompt, model=model) if not wants_json(ctx) else current.ask(prompt, model=model)
         emit_json(response_dict(response)) if wants_json(ctx) else show_response(response)
     except PromptPilotError as error:
-        if wants_json(ctx):
-            emit_json({"error": str(error), "type": type(error).__name__})
-        else:
-            console.print(f"[bold red]Error:[/bold red] {error}")
-        raise typer.Exit(code=1) from error
+        _fail(ctx, error)
 
 
 @app.command()
@@ -81,11 +103,7 @@ def batch(ctx: typer.Context, prompts: list[str] = typer.Argument(...), model: s
         else:
             show_batch(results)
     except PromptPilotError as error:
-        if wants_json(ctx):
-            emit_json({"error": str(error), "type": type(error).__name__})
-        else:
-            console.print(f"[bold red]Error:[/bold red] {error}")
-        raise typer.Exit(code=1) from error
+        _fail(ctx, error)
 
 
 @app.command("models")
@@ -95,11 +113,7 @@ def models(ctx: typer.Context) -> None:
         result = service().list_models()
         emit_json([item.model_dump() for item in result]) if wants_json(ctx) else show_models(result)
     except PromptPilotError as error:
-        if wants_json(ctx):
-            emit_json({"error": str(error), "type": type(error).__name__})
-        else:
-            console.print(f"[bold red]Error:[/bold red] {error}")
-        raise typer.Exit(code=1) from error
+        _fail(ctx, error)
 
 
 @app.command()
@@ -119,13 +133,15 @@ def benchmark(
     """Compare end-to-end latency for one prompt across models."""
     try:
         result = service().benchmark(models, prompt, rounds)
-        emit_json([item.to_dict() for item in result]) if wants_json(ctx) else show_benchmark(result)
-    except (PromptPilotError, ValueError) as error:
         if wants_json(ctx):
-            emit_json({"error": str(error), "type": type(error).__name__})
-        else:
-            console.print(f"[bold red]Error:[/bold red] {error}")
-        raise typer.Exit(code=1) from error
+            emit_json([item.to_dict() for item in result])
+            return
+        show_benchmark(result)
+        fastest = fastest_summary(result)
+        if fastest is not None:
+            console.print(f"[bold green]Fastest:[/bold green] {fastest.model}")
+    except (PromptPilotError, ValueError) as error:
+        _fail(ctx, error)
 
 
 @app.command("set-key")
@@ -156,18 +172,14 @@ def clear_stats() -> None:
     console.print("[green]Statistics cleared.[/green]")
 
 
-@app.command("probe")
+@app.command()
 def probe(ctx: typer.Context, models_to_probe: list[str] = typer.Argument(...)) -> None:
     """Demonstrate a thread pool with independent tiny API requests."""
     try:
         result = service().probe_models(models_to_probe)
         emit_json([asdict(item) for item in result]) if wants_json(ctx) else show_workers(result)
     except PromptPilotError as error:
-        if wants_json(ctx):
-            emit_json({"error": str(error), "type": type(error).__name__})
-        else:
-            console.print(f"[bold red]Error:[/bold red] {error}")
-        raise typer.Exit(code=1) from error
+        _fail(ctx, error)
 
 
 def main() -> None:
@@ -176,3 +188,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+__all__ = ["app", "main"]
