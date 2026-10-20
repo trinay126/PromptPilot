@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 
 from promptpilot.async_client import AsyncGroqApiClient
 from promptpilot.benchmark import BenchmarkRunner, BenchmarkSummary
@@ -23,7 +24,7 @@ class PromptPilotService:
     def __init__(self, config_store: ConfigStore | None = None, stats_store: StatsStore | None = None) -> None:
         self.config_store = config_store or ConfigStore()
         self.config = self.config_store.load()
-        stats_path = stats_store.path if stats_store else self.config_store.path.with_name("stats.jsonl")
+        stats_path = stats_store.path if stats_store else self.config_store.stats_path()
         self.stats_store = stats_store or StatsStore(stats_path)
         self.quota = QuotaManager(self.config, self.config_store.save)
 
@@ -58,59 +59,73 @@ class PromptPilotService:
         if not cleaned:
             raise ValueError("prompt cannot be blank")
         key, source = self._resolve_key()
+        target_model = model or self.config.model
         started = time.perf_counter()
         with GroqApiClient(
             api_key=key,
-            model=model or self.config.model,
+            model=target_model,
             timeout_seconds=self.config.timeout_seconds,
         ) as client:
-            response = client.ask(cleaned, model=model or self.config.model)
+            response = client.ask(cleaned, model=target_model)
         if source == "demo":
             self.quota.record_success()
         self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
         return response
 
-    def stream(self, prompt: str, model: str | None = None, on_token=None) -> str:
+    def stream(
+        self,
+        prompt: str,
+        model: str | None = None,
+        on_token: Callable[[str], None] | None = None,
+    ) -> str:
         """Stream deltas to `on_token`, then persist the completed response."""
         cleaned = clean_prompt(prompt)
         if not cleaned:
             raise ValueError("prompt cannot be blank")
         key, source = self._resolve_key()
+        target_model = model or self.config.model
         started = time.perf_counter()
         with GroqApiClient(
             api_key=key,
-            model=model or self.config.model,
+            model=target_model,
             timeout_seconds=self.config.timeout_seconds,
         ) as client:
-            text = client.stream(cleaned, model=model or self.config.model, on_token=on_token)
+            text = client.stream(cleaned, model=target_model, on_token=on_token)
         if source == "demo":
             self.quota.record_success()
         response = ChatResponse(
             id="streamed-local",
-            model=model or self.config.model,
+            model=target_model,
             choices=[{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
             usage=None,
         )
         self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
         return text
 
-    async def ask_many_async(self, prompts: list[str], model: str | None = None):
+    async def ask_many_async(
+        self,
+        prompts: list[str],
+        model: str | None = None,
+    ) -> list[ChatResponse | BaseException]:
+        """Send many prompts concurrently and keep the input ordering."""
         if not prompts:
             return []
         key, source = self._resolve_key()
+        target_model = model or self.config.model
         async with AsyncGroqApiClient(
                 api_key=key,
-                model=model or self.config.model,
+                model=target_model,
                 timeout_seconds=self.config.timeout_seconds,
             ) as client:
-            results = await client.ask_many(prompts, model=model or self.config.model)
+            results = await client.ask_many(prompts, model=target_model)
         if source == "demo":
             for result in results:
                 if isinstance(result, ChatResponse) and self.quota.can_use_demo():
                     self.quota.record_success()
         return results
 
-    def ask_many(self, prompts: list[str], model: str | None = None):
+    def ask_many(self, prompts: list[str], model: str | None = None) -> list[ChatResponse | BaseException]:
+        """Blocking wrapper around `ask_many_async` for the CLI."""
         return asyncio.run(self.ask_many_async(prompts, model=model))
 
     def list_models(self) -> list[ModelInfo]:
@@ -165,3 +180,6 @@ class PromptPilotService:
         def probe(model: str) -> str:
             return self.ask("Reply with the single word OK.", model=model).text
         return run_in_threads(models, probe, max_workers=min(4, max(1, len(models))))
+
+
+__all__ = ["PromptPilotService"]
