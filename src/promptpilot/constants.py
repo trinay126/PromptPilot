@@ -33,6 +33,25 @@ ENV_TIMEOUT_SECONDS: Final[str] = "PROMPTPILOT_TIMEOUT_SECONDS"
 COMPLETE_ENV_VAR: Final[str] = "_PROMPTPILOT_COMPLETE"
 SUPPORTED_SHELLS: Final[tuple[str, ...]] = ("bash", "zsh", "fish")
 
+# A working example per command, shown when the user gets the syntax wrong.
+EXAMPLES: Final[dict[str, str]] = {
+    "ask": 'promptpilot ask "Explain Python decorators"',
+    "batch": 'promptpilot batch "first prompt" "second prompt"',
+    "benchmark": "promptpilot benchmark --model llama-3.1-8b-instant --rounds 3",
+    "chat": "promptpilot chat",
+    "clear-stats": "promptpilot clear-stats",
+    "completions": "promptpilot completions bash",
+    "config path": "promptpilot config path",
+    "config set-key": "promptpilot config set-key",
+    "config set-model": "promptpilot config set-model llama-3.3-70b-versatile",
+    "config show": "promptpilot config show",
+    "dashboard": "promptpilot dashboard",
+    "history": "promptpilot history --limit 20",
+    "models": "promptpilot models",
+    "probe": "promptpilot probe llama-3.1-8b-instant llama-3.3-70b-versatile",
+    "select-model": "promptpilot select-model",
+}
+
 __all__ = [
     "APP_NAME",
     "APP_TAGLINE",
@@ -46,6 +65,7 @@ __all__ = [
     "ENV_API_KEY",
     "ENV_MODEL",
     "ENV_TIMEOUT_SECONDS",
+    "EXAMPLES",
     "GROQ_BASE_URL",
     "SUPPORTED_SHELLS",
 ]

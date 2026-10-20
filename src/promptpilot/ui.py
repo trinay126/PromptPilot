@@ -15,7 +15,7 @@ from rich.text import Text
 from rich.theme import Theme
 
 from promptpilot.benchmark import BenchmarkSummary
-from promptpilot.constants import APP_NAME, APP_TAGLINE
+from promptpilot.constants import APP_NAME, APP_TAGLINE, EXAMPLES
 from promptpilot.schemas import ChatResponse, ModelInfo, PromptStat
 from promptpilot.utils import format_latency, mask_secret, truncate
 from promptpilot.workers import WorkerResult
@@ -112,6 +112,22 @@ def show_error(message: str, hint: str | None = None) -> None:
         body.append("\n\n")
         body.append(hint, style="muted")
     error_console.print(Panel(body, border_style="red", title="[err]Error[/err]", padding=(1, 2)))
+
+
+def show_usage_error(message: str, command: str | None = None) -> None:
+    """Render a command-line usage mistake with an example that works."""
+    body = Text(message, style="err")
+    example = EXAMPLES.get(command or "")
+    if example:
+        body.append("\n\n")
+        body.append("Try:\n", style="muted")
+        body.append(f"  {example}", style="key")
+    if command:
+        body.append("\n")
+        body.append(f"Run '{command} --help' for the full list of options.", style="muted")
+    error_console.print(
+        Panel(body, border_style="red", title="[err]Usage[/err]", padding=(1, 2))
+    )
 
 
 def show_success(message: str) -> None:

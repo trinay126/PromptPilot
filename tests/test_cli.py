@@ -8,7 +8,7 @@ from typer.testing import CliRunner
 
 from promptpilot.cli import app
 from promptpilot.exceptions import ConfigurationError
-from promptpilot.schemas import AppConfig, ChatResponse, Choice, ChoiceMessage
+from promptpilot.schemas import AppConfig, ChatResponse, Choice, ChoiceMessage, ModelInfo
 
 runner = CliRunner()
 
@@ -460,3 +460,59 @@ def test_select_model_fallback_rejects_an_out_of_range_number(
 
     assert result.exit_code == 0
     assert "No model selected." in result.output
+
+
+def test_benchmark_without_a_model_uses_the_preferred_model(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["benchmark"])
+
+    assert result.exit_code == 0
+    assert fake_service.benchmarked[0][0] == ["test-model"]
+
+
+def test_benchmark_with_explicit_models(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["benchmark", "-m", "model-a", "-m", "model-b"])
+
+    assert result.exit_code == 0
+    assert fake_service.benchmarked[0][0] == ["model-a", "model-b"]
+
+
+def test_benchmark_all_uses_the_live_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
+    double = FakeService()
+    double.list_models = lambda: [
+        ModelInfo(id="model-a", owned_by="OpenAI"),
+        ModelInfo(id="model-b", owned_by="OpenAI"),
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["benchmark", "--all", "--rounds", "1"])
+
+    assert result.exit_code == 0
+    assert double.benchmarked[0][0] == ["model-a", "model-b"]
+
+
+def test_benchmark_all_asks_before_a_large_run(monkeypatch: pytest.MonkeyPatch) -> None:
+    double = FakeService()
+    double.list_models = lambda: [
+        ModelInfo(id=f"model-{index}", owned_by="OpenAI") for index in range(30)
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["benchmark", "--all", "--rounds", "3"], input="n\n")
+
+    assert result.exit_code == 0
+    assert "Benchmark cancelled." in result.output
+    assert double.benchmarked == []
+
+
+def test_usage_error_shows_a_working_example() -> None:
+    result = runner.invoke(app, ["config", "set-model"])
+
+    assert result.exit_code == 2
+    assert "promptpilot config set-model llama-3.3-70b-versatile" in result.output
+
+
+def test_unknown_command_reports_a_suggestion() -> None:
+    result = runner.invoke(app, ["bencmark"])
+
+    assert result.exit_code == 2
+    assert "benchmark" in result.output

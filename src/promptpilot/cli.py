@@ -7,6 +7,7 @@ import sys
 from dataclasses import asdict
 
 import typer
+from typer._click import exceptions as click_exceptions
 from typer.completion import get_completion_script
 
 from promptpilot import __version__
@@ -43,6 +44,7 @@ from promptpilot.ui import (
     show_rule,
     show_setup_intro,
     show_success,
+    show_usage_error,
     show_workers,
     stream_to_terminal,
 )
@@ -57,6 +59,51 @@ EPILOG = """
   promptpilot --json dashboard | jq .stats  machine-readable output
 """
 
+_COMMAND_PATH: list[str] = []
+
+
+class PromptPilotGroup(typer.core.TyperGroup):
+    """A command group that renders usage mistakes in the PromptPilot style."""
+
+    def resolve_command(self, ctx, args):
+        """Record the resolved command path so usage errors can name it."""
+        name, command, rest = super().resolve_command(ctx, args)
+        path = list(ctx.meta.get("promptpilot_path", ()))
+        path.append(name)
+        ctx.meta["promptpilot_path"] = path
+        _COMMAND_PATH[:] = path
+        return name, command, rest
+
+    def main(self, *args, **kwargs):
+        kwargs.setdefault("standalone_mode", False)
+        try:
+            result = super().main(*args, **kwargs)
+        except click_exceptions.UsageError as error:
+            show_usage_error(error.format_message(), _command_name(error))
+            raise SystemExit(error.exit_code) from None
+        except click_exceptions.ClickException as error:
+            show_error(error.format_message())
+            raise SystemExit(error.exit_code) from None
+        except click_exceptions.Abort:
+            console.print("[muted]Aborted.[/muted]")
+            raise SystemExit(1) from None
+        if isinstance(result, int):
+            raise SystemExit(result)
+        return result
+
+
+def _command_name(error: Exception) -> str | None:
+    """Return the command path an error refers to, for example 'config set-key'."""
+    context = getattr(error, "ctx", None)
+    if context is not None:
+        path = context.meta.get("promptpilot_path")
+        if path:
+            return " ".join(path)
+    if _COMMAND_PATH:
+        return " ".join(_COMMAND_PATH)
+    return None
+
+
 app = typer.Typer(
     name="promptpilot",
     help=f"{APP_NAME} — {APP_TAGLINE}.",
@@ -65,6 +112,7 @@ app = typer.Typer(
     add_completion=True,
     rich_markup_mode="rich",
     pretty_exceptions_enable=False,
+    cls=PromptPilotGroup,
 )
 
 config_app = typer.Typer(
@@ -72,6 +120,7 @@ config_app = typer.Typer(
     help="Manage your local PromptPilot configuration.",
     no_args_is_help=True,
     rich_markup_mode="rich",
+    cls=PromptPilotGroup,
 )
 app.add_typer(config_app)
 
@@ -407,15 +456,34 @@ def history(
 def benchmark(
     ctx: typer.Context,
     models: list[str] = typer.Option(
-        ..., "--model", "-m", help="Repeat the benchmark for each model."
+        None,
+        "--model",
+        "-m",
+        help="Models to compare. Repeat the flag for each one. Defaults to your preferred model.",
     ),
     prompt: str = typer.Option(
         "Reply with the single word OK.", "--prompt", "-p", help="Prompt to send."
     ),
     rounds: int = typer.Option(3, "--rounds", min=1, max=20),
+    all_models: bool = typer.Option(
+        False, "--all", help="Benchmark every model in your live catalog."
+    ),
 ) -> None:
     """Compare end-to-end latency for one prompt across models."""
     current = service()
+
+    if all_models:
+        catalog = [model.id for model in current.list_models()]
+        if not catalog:
+            show_error("Your account has no models available.")
+            raise typer.Exit(code=1)
+        if not _confirm_large_benchmark(len(catalog), rounds):
+            show_info("Benchmark cancelled.")
+            return
+        models = catalog
+    elif not models:
+        models = [current.config.model]
+
     result: list = []
     _run(ctx, lambda: result.extend(current.benchmark(models, prompt, rounds)))
     if wants_json(ctx):
@@ -425,6 +493,21 @@ def benchmark(
     fastest = fastest_summary(result)
     if fastest is not None:
         console.print(f"[ok]Fastest:[/ok] {fastest.model}")
+
+
+def _confirm_large_benchmark(model_count: int, rounds: int) -> bool:
+    """Ask before running a benchmark that would issue many requests."""
+    total = model_count * rounds
+    if total <= 20:
+        return True
+    console.print(
+        f"[warn]This will send {total} requests[/warn] "
+        f"({model_count} models x {rounds} rounds)."
+    )
+    try:
+        return typer.confirm("Continue?", default=False)
+    except (EOFError, KeyboardInterrupt):
+        return False
 
 
 @app.command()
