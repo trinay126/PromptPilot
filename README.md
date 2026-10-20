@@ -4,9 +4,9 @@
 
 **A production-minded Groq AI command-line workbench.**
 
-Real SSE streaming · interactive multi-turn chat · live model benchmarking ·
-local statistics · machine-readable `--json` output — wrapped in a polished
-terminal UI and backed by a fully typed, fully tested service layer.
+Real SSE streaming, an interactive multi-turn chat, live model benchmarking,
+local statistics, and machine-readable output — wrapped in a polished terminal
+UI and backed by a fully typed, fully tested service layer.
 
 [![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f?logo=open-source-initiative&logoColor=white)](LICENSE)
@@ -14,7 +14,7 @@ terminal UI and backed by a fully typed, fully tested service layer.
 [![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
 [![Typed](https://img.shields.io/badge/typing-annotated-2A6DB2?logo=python&logoColor=white)](src/promptpilot/schemas.py)
 
-[**Install**](#quick-start) &nbsp;·&nbsp; [**Commands**](#command-reference) &nbsp;·&nbsp; [**Configure**](#configuration) &nbsp;·&nbsp; [**Architecture**](#architecture) &nbsp;·&nbsp; [**Develop**](#development)
+[**Setup**](#setup) &nbsp;·&nbsp; [**Start here**](#start-here) &nbsp;·&nbsp; [**Commands**](#command-reference) &nbsp;·&nbsp; [**How it works**](#architecture)
 
 </div>
 
@@ -47,7 +47,7 @@ terminal UI and backed by a fully typed, fully tested service layer.
 
 <div align="center">
 
-**Get started in three commands**
+**Three commands and you are running**
 
 ```bash
 pip install -e ".[dev]"
@@ -63,11 +63,11 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **12** | **197** | **89%** | **0** |
+| **12** | **208** | **89%** | **0** |
 
-| Runtime deps | Test suite | Network in CI | License |
-|:------------:|:----------:|:-------------:|:-------:|
-| **5** | **~1 second** | **0 calls** | **MIT** |
+| Runtime deps | Test suite | Network in CI | Platforms |
+|:------------:|:----------:|:-------------:|:----------:|
+| **5** | **~1 second** | **0 calls** | **Linux · macOS · Windows** |
 
 ---
 
@@ -87,9 +87,10 @@ adapter could reuse it without rewriting the Groq integration.
 
 | Capability | Why it matters |
 |---|---|
-| **Zero-configuration onboarding** | One guided command stores your key. No bundled key and no demo allowance — you always authenticate as yourself. |
+| **Your key, stored once** | `promptpilot config set-key` writes it to your user config directory. It is reused forever — you are never asked again. |
 | **Real streaming** | Server-Sent Events are parsed at the wire level, so tokens render the moment Groq produces them. |
 | **Interactive chat** | A REPL that sends earlier turns back as context, with `/help`, `/history`, `/reset`, and `/exit`. |
+| **Interactive model picker** | Browse the live catalog, grouped by owner, and search it as you type. |
 | **Automation-first** | A global `--json` flag turns every command into a clean JSON document for `jq`, CI, and shell pipelines. |
 | **Honest benchmarks** | Average, median, P95, min, and max latency per model, with the fastest one called out. |
 | **Zero-dependency tests** | `respx` mocks the HTTPX transport, so the suite runs offline, for free, in about a second. |
@@ -98,17 +99,11 @@ adapter could reuse it without rewriting the Groq integration.
 
 ## Table of contents
 
-- [At a glance](#at-a-glance)
-- [Why PromptPilot](#why-promptpilot)
+- [Setup](#setup) — [Linux](#linux) · [macOS](#macos) · [Windows](#windows)
+- [Start here](#start-here)
+- [What do I want?](#what-do-i-want)
 - [Screenshots](#screenshots)
-- [Requirements](#requirements)
-- [Quick start](#quick-start)
-- [Linux and other Unix systems](#linux-and-other-unix-systems)
-- [Command cheat sheet](#command-cheat-sheet)
 - [Command reference](#command-reference)
-  - [ask](#ask) · [chat](#chat) · [batch](#batch) · [models](#models)
-  - [select-model](#select-model) · [dashboard](#dashboard) · [history](#history)
-  - [benchmark](#benchmark) · [probe](#probe) · [clear-stats](#clear-stats) · [completions](#completions) · [config](#config)
 - [Automation with `--json`](#automation-with---json)
 - [Configuration](#configuration)
 - [Under the hood](#under-the-hood)
@@ -121,6 +116,290 @@ adapter could reuse it without rewriting the Groq integration.
 - [Security model](#security-model)
 - [Contributing](#contributing)
 - [License](#license)
+
+---
+
+## Setup
+
+**You need two things:** Python 3.11 or newer, and a free Groq API key from
+[console.groq.com/keys](https://console.groq.com/keys).
+
+> **Your key is stored once and reused forever.**
+> `promptpilot config set-key` writes it to your per-user config directory
+> (`~/.config/promptpilot/config.json` on Linux). Every later command picks it
+> up automatically, so you are only ever asked for it once. It is never
+> committed to the repository, and it is masked whenever the CLI displays it.
+
+### Linux
+
+#### Install
+
+The recommended route on Linux is [`pipx`](https://pipx.pypa.io/). It installs
+the tool into its own isolated environment and puts it on your `PATH` — no
+`sudo`, no risk to your system Python, and it works from any directory.
+
+```bash
+# Fedora
+sudo dnf install pipx
+# Ubuntu / Debian
+sudo apt install pipx
+# Arch
+sudo pacman -S python-pipx
+
+pipx ensurepath          # adds ~/.local/bin to your PATH
+```
+
+Restart your shell, then install PromptPilot:
+
+```bash
+pipx install git+https://github.com/trinay126/PromptPilot.git
+```
+
+Verify it:
+
+```bash
+promptpilot --version
+```
+
+> **Prefer a local checkout?** Clone the repository and use a virtual
+> environment instead:
+>
+> ```bash
+> git clone https://github.com/trinay126/PromptPilot.git
+> cd PromptPilot
+> python3 -m venv .venv
+> source .venv/bin/activate
+> python -m pip install -e ".[dev]"
+> ```
+>
+> Note `python3` rather than `python` — most modern Linux distributions do not
+> provide a bare `python` command. While the virtual environment is active,
+> `promptpilot` is on your `PATH`; deactivate it with `deactivate`.
+
+#### Store your key
+
+```bash
+promptpilot config set-key
+```
+
+The prompt hides what you type. The key is saved to
+`~/.config/promptpilot/config.json` and reused by every future command, so
+this is the only time you are asked for it.
+
+```bash
+promptpilot config show      # confirm it is there (always masked)
+```
+
+#### Shell completion
+
+Tab completion works with `bash`, `zsh`, and `fish`. The script is printed to
+stdout, so you can put it wherever your setup expects it.
+
+```bash
+# bash
+mkdir -p ~/.local/share/bash-completion/completions
+promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
+```
+
+```bash
+# zsh
+mkdir -p ~/.zfunc
+promptpilot completions zsh > ~/.zfunc/_promptpilot
+echo 'fpath+=~/.zfunc' >> ~/.zshrc
+echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
+```
+
+```bash
+# fish
+mkdir -p ~/.config/fish/completions
+promptpilot completions fish > ~/.config/fish/completions/promptpilot.fish
+```
+
+Fedora, Debian, and Ubuntu load `~/.local/share/bash-completion/completions`
+automatically once the `bash-completion` package is installed
+(`sudo dnf install bash-completion`). If you would rather not manage the file
+yourself, the built-in installer does it for you:
+
+```bash
+promptpilot --install-completion
+```
+
+#### Headless use, pipes, and CI
+
+When output is piped or redirected, PromptPilot detects that it is not a
+terminal and drops the interactive chrome automatically. You can also control
+it explicitly:
+
+| Need | Command |
+|---|---|
+| Plain text, no ANSI colour | `promptpilot --no-color dashboard` |
+| Honour the `NO_COLOR` standard | `NO_COLOR=1 promptpilot dashboard` |
+| Force colour back on | `promptpilot --color dashboard` |
+| Pure JSON, no styling at all | `promptpilot --json dashboard` |
+| Detect a non-interactive terminal | `TERM=dumb promptpilot dashboard` |
+
+`NO_COLOR` follows the [no-color.org](https://no-color.org/) convention and is
+honoured automatically, so tools like `bat`, `ripgrep`, and `ls` behave the
+same way in your environment.
+
+Exit codes follow the usual Unix convention: `0` for success, `1` for a
+handled error, and `2` for a usage mistake. See
+[Troubleshooting](#troubleshooting) for the full table.
+
+A worked example — pull the average latency out of the dashboard with `jq`:
+
+```bash
+promptpilot --json dashboard | jq -r '.stats.average_latency_ms'
+```
+
+#### Run on a schedule
+
+Because the tool is scriptable, `systemd` and `cron` both work. A **user**
+timer keeps the key in your own environment rather than a system-wide secret:
+
+```ini
+# ~/.config/systemd/user/promptpilot-report.service
+[Service]
+Type=oneshot
+Environment=GROQ_API_KEY=gsk_your_key_here
+ExecStart=%h/.local/bin/promptpilot --json dashboard
+```
+
+```ini
+# ~/.config/systemd/user/promptpilot-report.timer
+[Timer]
+OnCalendar=daily
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+```bash
+systemctl --user enable --now promptpilot-report.timer
+systemctl --user list-timers
+```
+
+The same thing with `cron`:
+
+```cron
+0 9 * * * GROQ_API_KEY=gsk_your_key_here /usr/local/bin/promptpilot --json dashboard >> ~/promptpilot.log 2>&1
+```
+
+#### Run inside a container
+
+```dockerfile
+FROM python:3.12-slim
+RUN pip install --no-cache-dir git+https://github.com/trinay126/PromptPilot.git
+ENTRYPOINT ["promptpilot"]
+```
+
+```bash
+docker run --rm -e GROQ_API_KEY promptpilot ask "Hello from a container"
+```
+
+Mount a volume at `/root/.config/promptpilot` if you want the configuration and
+statistics to survive between runs.
+
+### macOS
+
+Everything in the Linux section above works on macOS unchanged. The only
+differences are the package manager and the config location:
+
+```bash
+brew install pipx && pipx ensurepath
+pipx install git+https://github.com/trinay126/PromptPilot.git
+```
+
+Your config lives in
+`~/Library/Application Support/promptpilot/config.json`, and your shell
+completion goes in the same place as on Linux.
+
+### Windows
+
+```powershell
+git clone https://github.com/trinay126/PromptPilot.git
+cd PromptPilot
+py -3.11 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+```
+
+Or install it system-wide with `pipx` under
+[Python for Windows](https://www.python.org/downloads/windows/):
+
+```powershell
+pipx install git+https://github.com/trinay126/PromptPilot.git
+```
+
+Your config lives in `%APPDATA%\promptpilot\config.json`.
+
+Two Windows differences worth knowing:
+
+- The interactive model picker needs a raw terminal, so on Windows it falls
+  back to a numbered list you pick from by typing a number.
+- Shell completion is generated for `bash`, `zsh`, and `fish`. In PowerShell,
+  use `promptpilot --install-completion` if you use a compatible shell.
+
+A ready-to-run `promptpilot.exe` is published with every release — see
+[Windows executable](#windows-executable).
+
+---
+
+## Start here
+
+A five-minute tour. Each step works on its own.
+
+### 1. Store your key — once
+
+```bash
+promptpilot config set-key
+```
+
+### 2. Ask a question
+
+```bash
+promptpilot ask "Explain Python decorators in one paragraph."
+```
+
+### 3. Watch it arrive token by token
+
+```bash
+promptpilot ask --stream "Write a haiku about caching"
+```
+
+### 4. Pick a model
+
+```bash
+promptpilot select-model
+```
+
+### 5. Hold a conversation
+
+```bash
+promptpilot chat
+```
+
+---
+
+## What do I want?
+
+| If you want to… | Run |
+|---|---|
+| Ask a question | `promptpilot ask "your prompt"` |
+| See the answer arrive token by token | `promptpilot ask --stream "your prompt"` |
+| Hold a multi-turn conversation | `promptpilot chat` |
+| Ask several questions at once | `promptpilot batch "one" "two"` |
+| See which models your account can use | `promptpilot models` |
+| Change your default model | `promptpilot select-model` |
+| Compare how fast models are | `promptpilot benchmark` |
+| See what you have run recently | `promptpilot history` |
+| See your settings and usage | `promptpilot dashboard` |
+| Pipe results into another program | `promptpilot --json <command>` |
+| Delete your local history | `promptpilot clear-stats` |
+| Check or change your key and model | `promptpilot config show` |
+| Print your config file locations | `promptpilot config path` |
 
 ---
 
@@ -211,7 +490,7 @@ Caching turns a slow query into a fast one.
 │ * │ llama-3.1-8b-instant    │ groq   │
 │   │ llama-3.3-70b-versatile │ groq   │
 │   │ openai/gpt-oss-120b     │ openai │
-└───┴────────────────━━━━━━━━─┴────────┘
+└───┴─────────────────────────┴────────┘
 * active model   llama-3.1-8b-instant
 ```
 
@@ -260,306 +539,6 @@ Fastest: llama-3.3-70b-versatile
 
 ---
 
-## Requirements
-
-| | |
-|---|---|
-| **Python** | 3.11 or newer (uses PEP 604 union syntax, `datetime.UTC`, `ParamSpec`) |
-| **A Groq account** | A free key from [console.groq.com/keys](https://console.groq.com/keys) |
-| **OS** | Linux, macOS, or Windows — configuration paths adapt per platform |
-
-Runtime dependencies: `httpx`, `pydantic`, `python-dotenv`, `rich`, `typer`.
-That is the whole list.
-
-On Linux, [pipx](https://pipx.pypa.io/) is the recommended way to install the
-tool, and shell completion is supported for `bash`, `zsh`, and `fish` — see
-[Linux and other Unix systems](#linux-and-other-unix-systems).
-
----
-
-## Quick start
-
-**1 — Install**
-
-```bash
-git clone https://github.com/trinay126/PromptPilot.git
-cd PromptPilot
-python -m venv .venv
-source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-**2 — Add your key**
-
-Create a free key at [console.groq.com/keys](https://console.groq.com/keys), then:
-
-```bash
-promptpilot config set-key
-```
-
-The prompt hides what you type. The key is written to your user config
-directory and is never committed to the repository. Exporting `GROQ_API_KEY`
-works too — PromptPilot prefers a saved key and falls back to the environment.
-
-**3 — Say something**
-
-```bash
-promptpilot ask "Explain Python decorators in one paragraph."
-```
-
-> **Note** — PromptPilot uses **your own** API key. There is no bundled key and
-> no demo allowance, so nothing you run is metered against someone else's
-> account.
-
----
-
-## Linux and other Unix systems
-
-PromptPilot is a native Unix citizen: it uses XDG paths, reads `.env` files,
-speaks your shell's completion protocol, and stays quiet and machine-readable
-when it is not attached to a terminal.
-
-### Install
-
-Two supported routes, depending on whether you want to *use* the tool or
-*develop* it.
-
-**As a user — [`pipx`](https://pipx.pypa.io/).** `pipx` installs the tool into
-its own isolated virtual environment and puts it on your `PATH`. No `sudo`, no
-`pip install --user`, and no risk of breaking the system Python:
-
-```bash
-# Debian/Ubuntu
-sudo apt install pipx && pipx ensurepath
-
-# Fedora
-sudo dnf install pipx && pipx ensurepath
-
-# Arch
-sudo pacman -S python-pipx && pipx ensurepath
-
-# from source, straight from git
-pipx install git+https://github.com/trinay126/PromptPilot.git
-```
-
-`pipx ensurepath` adds `~/.local/bin` to your `PATH`; restart the shell
-afterwards.
-
-**As a developer — a local virtual environment:**
-
-```bash
-git clone https://github.com/trinay126/PromptPilot.git
-cd PromptPilot
-python3 -m venv .venv
-source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
-```
-
-Use `python3` rather than `python` on distributions where `python` is not
-mapped to Python 3 — most modern Linux systems do not provide a bare `python`
-command at all.
-
-### Shell completion
-
-Tab completion for commands, subcommands, and options works with `bash`,
-`zsh`, and `fish`.
-
-```bash
-# bash — the standard bash-completion location
-mkdir -p ~/.local/share/bash-completion/completions
-promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
-```
-
-```bash
-# zsh
-mkdir -p ~/.zfunc
-promptpilot completions zsh > ~/.zfunc/_promptpilot
-echo 'fpath+=~/.zfunc' >> ~/.zshrc
-echo 'autoload -Uz compinit && compinit' >> ~/.zshrc
-```
-
-```bash
-# fish
-mkdir -p ~/.config/fish/completions
-promptpilot completions fish > ~/.config/fish/completions/promptpilot.fish
-```
-
-Because the script goes to **stdout**, you can place it wherever your setup
-expects it — a dotfiles repository, a Debian package, a container image, or a
-Nix/Home Manager configuration:
-
-```bash
-# dotfiles repository, managed by chezmoi / stow / yadm
-promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
-
-# container image
-RUN promptpilot completions bash > /etc/bash_completion.d/promptpilot
-
-# Nix (Home Manager)
-programs.bash.enableCompletion = true;
-programs.bash.completions.promptpilot = "${pkgs.promptpilot}/share/bash-completion/completions/promptpilot";
-```
-
-If you would rather not manage the file yourself, the built-in installer writes
-it for you:
-
-```bash
-promptpilot --install-completion     # writes to the default location for your shell
-promptpilot --show-completion        # print it without installing
-```
-
-### Where configuration lives
-
-On Linux, PromptPilot follows the **XDG Base Directory** specification:
-
-```text
-$XDG_CONFIG_HOME/promptpilot/config.json     # default: ~/.config/promptpilot/config.json
-$XDG_CONFIG_HOME/promptpilot/stats.jsonl     # local request history
-```
-
-Override the location for a single run, or for a whole CI job:
-
-```bash
-XDG_CONFIG_HOME=/tmp/promptpilot-config promptpilot config show
-```
-
-A `.env` file in the working directory is loaded automatically, which is handy
-for a project checkout:
-
-```bash
-cat > .env <<'EOF'
-GROQ_API_KEY=gsk_your_key_here
-PROMPTPILOT_MODEL=llama-3.3-70b-versatile
-EOF
-```
-
-`.env` is git-ignored by default. Remember that `GROQ_API_KEY` in the
-environment takes precedence over nothing else — a key saved with
-`promptpilot config set-key` wins over the environment variable.
-
-### Headless, pipes, and CI
-
-When output is piped or redirected, PromptPilot detects that it is not a
-terminal and drops the interactive chrome automatically. You can also control
-it explicitly:
-
-| Need | Command |
-|---|---|
-| Plain text, no ANSI colour | `promptpilot --no-color dashboard` |
-| Honour the `NO_COLOR` standard | `NO_COLOR=1 promptpilot dashboard` |
-| Force colour back on | `promptpilot --color dashboard` |
-| Pure JSON, no styling at all | `promptpilot --json dashboard` |
-| Detect a non-interactive terminal | `TERM=dumb promptpilot dashboard` |
-
-`NO_COLOR` follows the [no-color.org](https://no-color.org/) convention and is
-honoured automatically, so tools like `bat`, `ripgrep`, and `ls` behave the
-same way in your environment.
-
-Exit codes follow the usual Unix convention: `0` for success, `1` for a
-handled error, and `2` for a usage mistake. See
-[Troubleshooting](#troubleshooting) for the full table.
-
-A worked example — pull the average latency out of the dashboard with `jq`:
-
-```bash
-promptpilot --json dashboard | jq -r '.stats.average_latency_ms'
-```
-
-### Running on a schedule
-
-Because the tool is scriptable, `systemd` and `cron` both work. A **user**
-timer keeps the key in your own environment rather than a system-wide secret:
-
-```ini
-# ~/.config/systemd/user/promptpilot-report.service
-[Service]
-Type=oneshot
-Environment=GROQ_API_KEY=gsk_your_key_here
-ExecStart=%h/.local/bin/promptpilot --json dashboard
-```
-
-```ini
-# ~/.config/systemd/user/promptpilot-report.timer
-[Timer]
-OnCalendar=daily
-Persistent=true
-
-[Install]
-WantedBy=timers.target
-```
-
-```bash
-systemctl --user enable --now promptpilot-report.timer
-systemctl --user list-timers
-```
-
-The same thing with `cron`:
-
-```cron
-0 9 * * * GROQ_API_KEY=gsk_your_key_here /usr/local/bin/promptpilot --json dashboard >> ~/promptpilot.log 2>&1
-```
-
-### Running inside a container
-
-The project installs cleanly into a slim image:
-
-```dockerfile
-FROM python:3.12-slim
-RUN pip install --no-cache-dir git+https://github.com/trinay126/PromptPilot.git
-ENTRYPOINT ["promptpilot"]
-```
-
-```bash
-docker run --rm -e GROQ_API_KEY promptpilot ask "Hello from a container"
-```
-
-Mount a volume at `/root/.config/promptpilot` if you want the configuration and
-statistics to survive between runs.
-
----
-
-## Command cheat sheet
-
-```bash
-# one-shot
-promptpilot ask "your prompt"
-promptpilot ask --stream "your prompt"            # live token stream
-promptpilot ask -m llama-3.3-70b-versatile "..."   # pick a model
-
-# conversation
-promptpilot chat                                   # multi-turn REPL
-
-# concurrency
-promptpilot batch "prompt one" "prompt two"        # asyncio.gather
-promptpilot probe model-a model-b                  # thread pool
-
-# discovery
-promptpilot models                                 # live catalog
-promptpilot select-model                           # interactive picker
-promptpilot benchmark -m model-a -m model-b --rounds 3
-
-# local state
-promptpilot dashboard                              # config + usage
-promptpilot history --limit 25                     # recent prompts
-promptpilot clear-stats                            # wipe history
-
-# configuration
-promptpilot config set-key
-promptpilot config set-model llama-3.3-70b-versatile
-promptpilot config show
-promptpilot config path
-
-# shell integration
-promptpilot completions bash > ~/.local/share/bash-completion/completions/promptpilot
-
-# automation
-promptpilot --json dashboard | jq .stats
-```
-
----
-
 ## Command reference
 
 Run `promptpilot --help` for the full list, or `promptpilot <command> --help`
@@ -586,18 +565,19 @@ for the options of a single command.
 │ --help                                  Show this message and exit.          │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 ╭─ Commands ───────────────────────────────────────────────────────────────────╮
-│ ask          Send one prompt and print the answer.                           │
-│ chat         Start an interactive chat session that remembers the            │
-│              conversation.                                                   │
-│ batch        Run multiple prompts concurrently with asyncio.gather.          │
-│ models       List the live model catalog returned by Groq.                   │
-│ dashboard    Show local configuration and usage statistics.                  │
-│ history      Show the most recent prompts recorded on this machine.          │
-│ benchmark    Compare end-to-end latency for one prompt across models.        │
-│ probe        Demonstrate a thread pool with independent tiny API requests.   │
-│ clear-stats  Delete the local statistics history.                            │
-│ completions  Print the shell completion script for bash, zsh, or fish.       │
-│ config       Manage your local PromptPilot configuration.                    │
+│ ask           Send one prompt and print the answer.                          │
+│ chat          Start an interactive chat session that remembers the           │
+│               conversation.                                                  │
+│ batch         Run multiple prompts concurrently with asyncio.gather.         │
+│ models        List the live model catalog returned by Groq.                  │
+│ select-model  Browse the live model catalog and save the one you choose.     │
+│ dashboard     Show local configuration and usage statistics.                 │
+│ history       Show the most recent prompts recorded on this machine.         │
+│ benchmark     Compare end-to-end latency for one prompt across models.       │
+│ probe         Demonstrate a thread pool with independent tiny API requests.  │
+│ clear-stats   Delete the local statistics history.                           │
+│ completions   Print the shell completion script for bash, zsh, or fish.      │
+│ config        Manage your local PromptPilot configuration.                   │
 ╰──────────────────────────────────────────────────────────────────────────────╯
 
  Examples
@@ -787,7 +767,7 @@ promptpilot completions fish
 ```
 
 Printing to stdout (rather than writing to a fixed path) means the script can go
-anywhere your setup expects it — see [Linux and other Unix systems](#linux-and-other-unix-systems).
+anywhere your setup expects it — see [Linux](#linux).
 
 ### `config`
 
@@ -863,15 +843,15 @@ PromptPilot resolves settings in this order: **saved config file** →
 | `PROMPTPILOT_TIMEOUT_SECONDS` | HTTP timeout for every request | `45` |
 
 You can also copy `.env.example` to `.env` and edit it — `python-dotenv` loads
-it automatically.
+it automatically, searching from the current directory upwards.
 
 **Configuration file** — `promptpilot config path` prints the exact locations:
 
 | Platform | Path |
 |---|---|
-| Windows | `%APPDATA%\promptpilot\config.json` |
+| Linux | `$XDG_CONFIG_HOME/promptpilot/config.json` (or `~/.config/promptpilot/…`) |
 | macOS | `~/Library/Application Support/promptpilot/config.json` |
-| Linux | `$XDG_CONFIG_HOME/promptpilot/config.json` (or `~/.config/…`) |
+| Windows | `%APPDATA%\promptpilot\config.json` |
 
 ```json
 {
@@ -966,6 +946,7 @@ Two details worth calling out:
 |---|---|
 | `cli.py` | Parsing, output mode, error translation. No business rules. |
 | `ui.py` | Every piece of Rich rendering. Pure presentation. |
+| `picker.py` | The interactive model picker — search, grouping, raw key handling. |
 | `services.py` | The application boundary: key resolution, statistics, orchestration. |
 | `clients.py` / `async_client.py` | The HTTP boundary: headers, timeouts, retries, SSE parsing, schema validation. |
 | `schemas.py` | Pydantic models that validate every untrusted payload. |
@@ -1006,10 +987,11 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 197 tests, no network, no API key
+├── tests/                         # 208 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
+│   ├── test_cross_platform.py     # Linux, macOS, and Windows behaviour
 │   ├── test_stores.py             # JSONL persistence
 │   ├── test_utils.py              # pure helpers
 │   ├── test_decorators.py         # timing and retry policy
@@ -1018,8 +1000,8 @@ PromptPilot/
 │   ├── test_async_client.py       # async client and gather
 │   ├── test_workers.py            # thread pool
 │   ├── test_benchmark.py          # latency aggregation
-│   ├── test_service.py            # application rules
 │   ├── test_picker.py             # grouping, filtering, and key handling
+│   ├── test_service.py            # application rules
 │   ├── test_cli.py                # command dispatch and JSON output
 │   ├── test_chat.py               # interactive session
 │   └── test_ui.py                 # presentation layer
@@ -1051,7 +1033,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-197 passed
+208 passed
 89% coverage
 ruff: all checks passed
 ```
@@ -1135,7 +1117,7 @@ If `pipx ensurepath` is required, run it and restart your shell afterwards.
 
 You have not stored a key yet. Run `promptpilot config set-key`, or export
 `GROQ_API_KEY` in your shell. `promptpilot config show` shows which source is
-currently active.
+currently active. The key is stored once and reused by every later command.
 </details>
 
 <details>
@@ -1188,6 +1170,11 @@ rm -f "$(promptpilot --json config path | jq -r .config_path)"
 **Do I need a paid Groq plan?**
 No. The Groq free tier is enough for everything in this README.
 
+**Will it ask me for my key every time?**
+No. `promptpilot config set-key` writes it to your user config directory and
+every later command reads it from there. It is asked once, and masked in all
+output.
+
 **Is my key ever sent anywhere except Groq?**
 No. It travels only in the `Authorization` header of requests to
 `api.groq.com`. It is never logged, never printed unmasked, and never
@@ -1212,6 +1199,12 @@ Groq needs a key.
 With several models, the table alone makes you do the arithmetic. The summary
 line names the winner directly — but remember the numbers reflect one moment
 on one network, not a permanent ranking.
+
+**Does it work on Windows?**
+Yes. Configuration lives in `%APPDATA%\promptpilot\config.json`, a prebuilt
+`promptpilot.exe` ships with every release, and the test matrix covers Python
+3.11–3.13 on Windows. The one difference is the interactive model picker,
+which falls back to a numbered list when the console cannot provide raw input.
 
 ---
 
