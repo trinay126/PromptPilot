@@ -42,3 +42,13 @@ def test_run_in_threads_requires_a_positive_worker_count() -> None:
 def test_worker_result_reports_success() -> None:
     assert WorkerResult("item", "value", None, 1.0).succeeded is True
     assert WorkerResult("item", None, "failed", 1.0).succeeded is False
+
+
+def test_run_in_threads_handles_an_empty_item_list() -> None:
+    assert run_in_threads([], lambda item: item) == []
+
+
+def test_run_in_threads_preserves_the_worker_value() -> None:
+    results = run_in_threads([2], lambda item: item * 21)
+
+    assert results[0].value == 42
