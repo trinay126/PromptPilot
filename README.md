@@ -18,32 +18,11 @@ UI and backed by a fully typed, fully tested service layer.
 
 </div>
 
-```text
-┌────────────────────────────────────────────────────────────────────────────┐
-│ ●  ●  ●   promptpilot — Groq AI command-line workbench                     │
-├────────────────────────────────────────────────────────────────────────────┤
-│ ╭───────────────────────── llama-3.1-8b-instant ─────────────────────────╮ │
-│ │                                                                        │ │
-│ │  A decorator wraps a callable to add behaviour without changing its    │ │
-│ │  signature.                                                            │ │
-│ │                                                                        │ │
-│ │                                                                        │ │
-│ │   import functools                                                     │ │
-│ │                                                                        │ │
-│ │   def logged(func):                                                    │ │
-│ │       @functools.wraps(func)                                           │ │
-│ │       def wrapper(*args, **kwargs):                                    │ │
-│ │           print(f'calling {func.__name__}')                            │ │
-│ │           return func(*args, **kwargs)                                 │ │
-│ │       return wrapper                                                   │ │
-│ │                                                                        │ │
-│ │                                                                        │ │
-│ │  Read the source of the wrappers you use — most of them are a dozen    │ │
-│ │  lines long.                                                           │ │
-│ │                                                                        │ │
-│ ╰──────────────── 18 prompt + 142 completion = 160 total ────────────────╯ │
-└────────────────────────────────────────────────────────────────────────────┘
-```
+<div align="center">
+
+<img src="docs/demo.svg" alt="PromptPilot demo: listing models, asking a question, streaming a response, and reading JSON statistics" width="900">
+
+</div>
 
 <div align="center">
 
@@ -63,7 +42,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **12** | **208** | **89%** | **0** |
+| **12** | **213** | **89%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | Platforms |
 |:------------:|:----------:|:-------------:|:----------:|
@@ -972,6 +951,9 @@ PromptPilot/
 ├── README.md
 ├── LICENSE                        # MIT
 ├── .env.example
+├── docs/
+│   ├── demo.svg                   # animated terminal demo for the README
+│   └── demo.cast                  # the raw asciinema recording
 ├── src/promptpilot/
 │   ├── __init__.py                # package metadata
 │   ├── __main__.py                # `python -m promptpilot`
