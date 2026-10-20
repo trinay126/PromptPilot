@@ -45,7 +45,7 @@ class GroqApiClient:
         """Release the underlying HTTP connection pool."""
         self._client.close()
 
-    def __enter__(self) -> "GroqApiClient":
+    def __enter__(self) -> GroqApiClient:
         return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:

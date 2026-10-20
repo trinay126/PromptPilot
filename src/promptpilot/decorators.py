@@ -24,9 +24,9 @@ def timed(function: Callable[P, R]) -> Callable[P, R]:
             return function(*args, **kwargs)
         finally:
             elapsed_ms = (time.perf_counter() - started) * 1000
-            setattr(wrapper, "last_duration_ms", round(elapsed_ms, 2))
+            wrapper.last_duration_ms = round(elapsed_ms, 2)
 
-    setattr(wrapper, "last_duration_ms", 0.0)
+    wrapper.last_duration_ms = 0.0
     return wrapper
 
 

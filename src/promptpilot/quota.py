@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from threading import Lock
-from typing import Callable
 
 from promptpilot.exceptions import QuotaExceededError
 from promptpilot.schemas import AppConfig

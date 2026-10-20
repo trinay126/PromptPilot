@@ -41,7 +41,7 @@ class AsyncGroqApiClient:
             },
         )
 
-    async def __aenter__(self) -> "AsyncGroqApiClient":
+    async def __aenter__(self) -> AsyncGroqApiClient:
         return self
 
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:

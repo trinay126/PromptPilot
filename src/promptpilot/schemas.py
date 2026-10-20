@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -149,7 +149,7 @@ class PromptStat(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(UTC))
     model: str
     prompt_chars: int = Field(ge=0)
     response_chars: int = Field(ge=0)
