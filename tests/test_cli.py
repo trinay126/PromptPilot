@@ -33,6 +33,8 @@ class FakeService:
         self.config = AppConfig(model="test-model")
         self.asked: list[tuple[str, str | None]] = []
         self.streamed: list[tuple[str, str | None]] = []
+        self.benchmarked: list[tuple[list[str], str, int]] = []
+        self.probed: list[list[str]] = []
 
     def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
         self.asked.append((prompt, model))
@@ -44,6 +46,9 @@ class FakeService:
         if on_token:
             on_token(text)
         return text
+
+    def ask_many(self, prompts: list[str], model: str | None = None) -> list[ChatResponse]:
+        return [fake_response() for _ in prompts]
 
     def list_models(self):
         return []
@@ -61,6 +66,44 @@ class FakeService:
             "config_path": "/tmp/config.json",
             "stats_path": "/tmp/stats.jsonl",
         }
+
+    def benchmark(self, models: list[str], prompt: str, rounds: int = 3):
+        from promptpilot.benchmark import BenchmarkSummary
+
+        self.benchmarked.append((models, prompt, rounds))
+        return [
+            BenchmarkSummary(
+                model=model,
+                rounds=rounds,
+                successful=rounds,
+                failed=0,
+                average_ms=1.0,
+                median_ms=1.0,
+                p95_ms=1.0,
+                min_ms=1.0,
+                max_ms=1.0,
+                samples=(),
+            )
+            for model in models
+        ]
+
+    def probe_models(self, models: list[str]):
+        from promptpilot.workers import WorkerResult
+
+        self.probed.append(models)
+        return [WorkerResult(model, "OK", None, 1.0) for model in models]
+
+    def set_user_key(self, api_key: str) -> None:
+        self.saved_key = api_key
+
+    def set_model(self, model: str) -> None:
+        self.saved_model = model
+
+    def reset_demo(self) -> None:
+        self.was_reset = True
+
+    def clear_stats(self) -> None:
+        self.was_cleared = True
 
 
 @pytest.fixture
@@ -127,6 +170,75 @@ def test_batch_requires_two_prompts(fake_service: FakeService) -> None:
     assert "at least two prompts" in result.output
 
 
+def test_batch_json_mode_returns_one_entry_per_prompt(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "batch", "one", "two"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert len(payload) == 2
+    assert payload[0]["text"] == "Hello from a fake client."
+
+
+def test_models_json_mode_returns_a_list(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "models"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.output) == []
+
+
+def test_benchmark_json_mode_returns_the_summaries(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "benchmark", "--model", "model-a", "--rounds", "2"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload[0]["model"] == "model-a"
+    assert fake_service.benchmarked == [(["model-a"], "Reply with the single word OK.", 2)]
+
+
+def test_probe_json_mode_returns_the_worker_results(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "probe", "model-a", "model-b"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert [item["item"] for item in payload] == ["model-a", "model-b"]
+    assert fake_service.probed == [["model-a", "model-b"]]
+
+
+def test_set_key_saves_the_key(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["set-key", "--api-key", "gsk_live_key_value"])
+
+    assert result.exit_code == 0
+    assert fake_service.saved_key == "gsk_live_key_value"
+
+
+def test_set_key_can_prompt_for_the_key(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["set-key"], input="gsk_live_key_value\n")
+
+    assert result.exit_code == 0
+    assert fake_service.saved_key == "gsk_live_key_value"
+
+
+def test_set_model_saves_the_model(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["set-model", "llama-3.3-70b-versatile"])
+
+    assert result.exit_code == 0
+    assert fake_service.saved_model == "llama-3.3-70b-versatile"
+
+
+def test_reset_demo_clears_the_counter(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["reset-demo"])
+
+    assert result.exit_code == 0
+    assert fake_service.was_reset is True
+
+
+def test_clear_stats_removes_the_history(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["clear-stats"])
+
+    assert result.exit_code == 0
+    assert fake_service.was_cleared is True
+
+
 def test_errors_are_reported_as_json_in_json_mode(monkeypatch: pytest.MonkeyPatch) -> None:
     class FailingService(FakeService):
         def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
@@ -139,3 +251,15 @@ def test_errors_are_reported_as_json_in_json_mode(monkeypatch: pytest.MonkeyPatc
     payload = json.loads(result.output)
     assert payload["type"] == "ConfigurationError"
     assert "No Groq key found." in payload["error"]
+
+
+def test_errors_are_reported_as_text_in_human_mode(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingService(FakeService):
+        def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
+            raise ConfigurationError("No Groq key found.")
+
+    monkeypatch.setattr("promptpilot.cli.service", lambda: FailingService())
+    result = runner.invoke(app, ["ask", "hello"])
+
+    assert result.exit_code == 1
+    assert "No Groq key found." in result.output
