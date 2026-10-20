@@ -11,7 +11,7 @@ from promptpilot.benchmark import BenchmarkRunner, BenchmarkSummary
 from promptpilot.clients import GroqApiClient
 from promptpilot.config import ConfigStore
 from promptpilot.constants import DEFAULT_SYSTEM_PROMPT
-from promptpilot.exceptions import ConfigurationError, MissingAPIKeyError
+from promptpilot.exceptions import MissingAPIKeyError
 from promptpilot.schemas import ChatMessage, ChatResponse, ModelInfo, PromptStat
 from promptpilot.stores import StatsStore
 from promptpilot.utils import clean_prompt
