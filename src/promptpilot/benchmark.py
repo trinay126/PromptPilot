@@ -91,3 +91,14 @@ class BenchmarkRunner:
                 )
             )
         return summaries
+
+
+def fastest_summary(summaries: list[BenchmarkSummary]) -> BenchmarkSummary | None:
+    """Return the summary with the lowest average latency, if any succeeded."""
+    successful = [summary for summary in summaries if summary.successful]
+    if not successful:
+        return None
+    return min(successful, key=lambda summary: summary.average_ms)
+
+
+__all__ = ["BenchmarkRunner", "BenchmarkSample", "BenchmarkSummary", "fastest_summary"]
