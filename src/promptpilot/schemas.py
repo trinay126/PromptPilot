@@ -48,6 +48,19 @@ class ChatRequest(BaseModel):
     stream: bool = False
 
 
+class ConversationTurn(BaseModel):
+    """One user/assistant exchange kept in memory during an interactive chat."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    role: Role
+    content: str
+
+    def to_message(self) -> ChatMessage:
+        """Convert the turn into a validated API message."""
+        return ChatMessage(role=self.role, content=self.content)
+
+
 class ChoiceMessage(BaseModel):
     """Assistant message nested inside one completion choice."""
 
@@ -127,8 +140,6 @@ class AppConfig(BaseModel):
     api_key: str | None = None
     model: str = DEFAULT_MODEL
     timeout_seconds: float = Field(default=DEFAULT_TIMEOUT_SECONDS, gt=0, le=300)
-    demo_limit: int = Field(default=10, ge=0, le=10_000)
-    demo_prompts_used: int = Field(default=0, ge=0)
 
     @field_validator("api_key")
     @classmethod
@@ -139,13 +150,13 @@ class AppConfig(BaseModel):
         return cleaned or None
 
     @property
-    def demo_prompts_remaining(self) -> int:
-        """Return how many demo prompts are still available."""
-        return max(0, self.demo_limit - self.demo_prompts_used)
+    def has_api_key(self) -> bool:
+        """Report whether a personal API key is stored in the configuration."""
+        return bool(self.api_key)
 
 
 class PromptStat(BaseModel):
-    """One JSONL record used by the dashboard."""
+    """One JSONL record used by the dashboard and history view."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -156,7 +167,7 @@ class PromptStat(BaseModel):
     prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     latency_ms: float = Field(ge=0)
-    source: Literal["demo", "user"]
+    prompt_preview: str = ""
     success: bool = True
 
 
@@ -167,6 +178,7 @@ __all__ = [
     "ChatResponse",
     "Choice",
     "ChoiceMessage",
+    "ConversationTurn",
     "ModelInfo",
     "ModelListResponse",
     "PromptStat",
