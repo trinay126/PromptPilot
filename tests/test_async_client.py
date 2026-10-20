@@ -130,3 +130,53 @@ def test_api_error_keeps_the_status_code() -> None:
 def test_a_blank_api_key_is_rejected() -> None:
     with pytest.raises(ValueError):
         AsyncGroqApiClient("   ", "test-model")
+
+
+@respx.mock
+def test_ask_many_runs_every_prompt() -> None:
+    route = respx.post("https://api.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=CHAT_PAYLOAD)
+    )
+
+    async def run() -> list:
+        async with AsyncGroqApiClient(
+            "test-key", "test-model", base_url="https://api.test/v1"
+        ) as client:
+            return await client.ask_many(["one", "two", "three"])
+
+    asyncio.run(run())
+
+    assert route.call_count == 3
+
+
+@respx.mock
+def test_ask_sends_the_requested_model() -> None:
+    route = respx.post("https://api.test/v1/chat/completions").mock(
+        return_value=httpx.Response(200, json=CHAT_PAYLOAD)
+    )
+
+    async def run() -> None:
+        async with AsyncGroqApiClient(
+            "test-key", "test-model", base_url="https://api.test/v1"
+        ) as client:
+            await client.ask("ping", model="other-model")
+
+    asyncio.run(run())
+
+    assert b"other-model" in route.calls.last.request.content
+
+
+@respx.mock
+def test_list_models_error_is_translated() -> None:
+    respx.get("https://api.test/v1/models").mock(
+        return_value=httpx.Response(500, text="server error")
+    )
+
+    async def run() -> None:
+        async with AsyncGroqApiClient(
+            "test-key", "test-model", base_url="https://api.test/v1"
+        ) as client:
+            await client.list_models()
+
+    with pytest.raises(GroqAPIError):
+        asyncio.run(run())
