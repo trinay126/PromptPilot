@@ -20,6 +20,11 @@ class WorkerResult:
     error: str | None
     elapsed_ms: float
 
+    @property
+    def succeeded(self) -> bool:
+        """Report whether the worker finished without an error."""
+        return self.error is None
+
 
 def run_in_threads(
     items: list[T],
@@ -44,3 +49,6 @@ def run_in_threads(
         for future in as_completed(futures):
             results.append(future.result())
     return results
+
+
+__all__ = ["WorkerResult", "run_in_threads"]
