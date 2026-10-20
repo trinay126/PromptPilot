@@ -1,7 +1,7 @@
 import pytest
 
-from promptpilot.exceptions import ConfigurationError, QuotaExceededError
-from promptpilot.schemas import ChatResponse, Choice, ChoiceMessage, PromptStat, Usage
+from promptpilot.exceptions import MissingAPIKeyError
+from promptpilot.schemas import ChatMessage, ChatResponse, Choice, ChoiceMessage, PromptStat, Usage
 
 
 def fake_response() -> ChatResponse:
@@ -22,6 +22,7 @@ def fake_response() -> ChatResponse:
 class FakeClient:
     def __init__(self, **kwargs):
         self.kwargs = kwargs
+        self.requests = []
 
     def __enter__(self):
         return self
@@ -30,6 +31,7 @@ class FakeClient:
         return None
 
     def ask(self, prompt, model=None):
+        self.requests.append(prompt)
         return fake_response()
 
     def stream(self, prompt, model=None, on_token=None):
@@ -38,57 +40,41 @@ class FakeClient:
             on_token(text)
         return text
 
+    def build_request(self, messages, model=None):
+        from promptpilot.schemas import ChatRequest
+
+        return ChatRequest(model=model or "test-model", messages=messages)
+
+    def chat(self, request):
+        return fake_response()
+
 
 def test_service_uses_dependency_injected_client(monkeypatch, service) -> None:
-    monkeypatch.setenv("PROMPTPILOT_DEMO_API_KEY", "demo-key-for-tests")
-
-    class FakeClient:
-        def __init__(self, **kwargs):
-            self.kwargs = kwargs
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return None
-
-        def ask(self, prompt, model=None):
-            return fake_response()
-
+    monkeypatch.setenv("GROQ_API_KEY", "user-key-for-tests")
     monkeypatch.setattr("promptpilot.services.GroqApiClient", FakeClient)
     response = service.ask("  hello   world ")
 
     assert response.text == "Hello from a fake client."
-    assert service.quota.used == 1
     assert service.stats_store.summary()["requests"] == 1
 
 
-def test_service_records_a_user_prompt_without_touching_the_quota(monkeypatch, service) -> None:
+def test_service_records_the_prompt_and_latency(monkeypatch, service) -> None:
     monkeypatch.setenv("GROQ_API_KEY", "user-key-for-tests")
     monkeypatch.setattr("promptpilot.services.GroqApiClient", FakeClient)
 
     service.ask("hello")
 
-    assert service.quota.used == 0
     records = service.stats_store.all()
-    assert records[0].source == "user"
     assert records[0].prompt_chars == len("hello")
+    assert records[0].prompt_preview == "hello"
+    assert records[0].latency_ms >= 0
+    assert records[0].success is True
 
 
 def test_service_raises_when_no_key_is_configured(monkeypatch, service) -> None:
     monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    monkeypatch.delenv("PROMPTPILOT_DEMO_API_KEY", raising=False)
 
-    with pytest.raises(ConfigurationError):
-        service.ask("hello")
-
-
-def test_service_raises_when_the_demo_quota_is_exhausted(monkeypatch, service) -> None:
-    monkeypatch.setenv("PROMPTPILOT_DEMO_API_KEY", "demo-key-for-tests")
-    monkeypatch.delenv("GROQ_API_KEY", raising=False)
-    service.config.demo_prompts_used = service.config.demo_limit
-
-    with pytest.raises(QuotaExceededError):
+    with pytest.raises(MissingAPIKeyError):
         service.ask("hello")
 
 
@@ -109,14 +95,37 @@ def test_service_streams_and_records_the_response(monkeypatch, service) -> None:
     assert service.stats_store.summary()["requests"] == 1
 
 
-def test_service_dashboard_reports_quota_and_paths(service) -> None:
+def test_service_sends_earlier_turns_as_context(monkeypatch, service) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "user-key-for-tests")
+    captured = {}
+
+    class RecordingClient(FakeClient):
+        def chat(self, request):
+            captured["messages"] = request.messages
+            return fake_response()
+
+    monkeypatch.setattr("promptpilot.services.GroqApiClient", RecordingClient)
+    history = [
+        ChatMessage(role="user", content="first question"),
+        ChatMessage(role="assistant", content="first answer"),
+    ]
+
+    service.ask_with_history("second question", history)
+
+    roles = [message.role for message in captured["messages"]]
+    assert roles == ["system", "user", "assistant", "user"]
+    assert captured["messages"][-1].content == "second question"
+
+
+def test_service_dashboard_reports_paths_and_key_state(service) -> None:
     dashboard = service.dashboard()
 
     assert dashboard["model"] == "test-model"
-    assert dashboard["quota"]["limit"] == 10
     assert dashboard["stats"]["requests"] == 0
     assert dashboard["config_path"].endswith("config.json")
     assert dashboard["stats_path"].endswith("stats.jsonl")
+    assert "has_api_key" in dashboard
+    assert "api_key_source" in dashboard
 
 
 def test_service_persists_the_user_key(service) -> None:
@@ -143,11 +152,17 @@ def test_service_rejects_a_blank_model(service) -> None:
         service.set_model(" ")
 
 
-def test_service_resets_the_demo_counter(service) -> None:
-    service.quota.record_success()
-    service.reset_demo()
+def test_service_history_returns_recent_prompts(monkeypatch, service) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "user-key-for-tests")
+    monkeypatch.setattr("promptpilot.services.GroqApiClient", FakeClient)
 
-    assert service.quota.used == 0
+    service.ask("first")
+    service.ask("second")
+
+    records = service.history(limit=5)
+
+    assert len(records) == 2
+    assert records[-1].prompt_preview == "second"
 
 
 def test_service_clears_the_statistics(service) -> None:
@@ -157,7 +172,6 @@ def test_service_clears_the_statistics(service) -> None:
             prompt_chars=1,
             response_chars=1,
             latency_ms=1.0,
-            source="user",
         )
     )
 

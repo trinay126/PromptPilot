@@ -128,15 +128,19 @@ def test_show_workers_reports_the_error_column(capsys) -> None:
 def test_show_dashboard_renders_every_metric(capsys) -> None:
     show_dashboard({
         "model": "test-model",
-        "quota": {"limit": 10, "used": 1, "remaining": 9},
         "stats": {
             "requests": 1,
             "successful": 1,
             "failed": 0,
             "average_latency_ms": 12.5,
+            "prompt_tokens": 10,
+            "completion_tokens": 20,
+            "last_model": "test-model",
         },
         "config_path": "/tmp/config.json",
         "stats_path": "/tmp/stats.jsonl",
+        "api_key_source": "config file",
+        "has_api_key": True,
     })
 
     captured = capsys.readouterr()

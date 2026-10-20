@@ -23,7 +23,8 @@ def test_load_returns_defaults_when_the_file_is_missing(tmp_path: Path) -> None:
     config = store.load()
 
     assert config.model
-    assert config.demo_limit == 10
+    assert config.timeout_seconds > 0
+    assert config.api_key is None
 
 
 def test_save_and_load_round_trip(tmp_path: Path) -> None:
@@ -58,13 +59,11 @@ def test_default_config_reads_environment_overrides(
 ) -> None:
     monkeypatch.setenv("PROMPTPILOT_MODEL", "env-model")
     monkeypatch.setenv("PROMPTPILOT_TIMEOUT_SECONDS", "12")
-    monkeypatch.setenv("PROMPTPILOT_DEMO_LIMIT", "3")
 
     config = ConfigStore.default_config()
 
     assert config.model == "env-model"
     assert config.timeout_seconds == 12
-    assert config.demo_limit == 3
 
 
 def test_default_config_rejects_a_non_numeric_timeout(
@@ -95,10 +94,24 @@ def test_user_api_key_falls_back_to_the_environment(
     assert store.user_api_key() == "env-key"
 
 
-def test_demo_api_key_reads_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PROMPTPILOT_DEMO_API_KEY", "demo-key")
+def test_api_key_source_reports_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("GROQ_API_KEY", "env-key")
+    store = ConfigStore(tmp_path / "config.json")
 
-    assert ConfigStore.demo_api_key() == "demo-key"
+    assert store.api_key_source() == "environment (GROQ_API_KEY)"
+    assert store.has_api_key() is True
+
+
+def test_api_key_source_reports_a_missing_key(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("GROQ_API_KEY", raising=False)
+    store = ConfigStore(tmp_path / "config.json")
+
+    assert store.api_key_source() == "not configured"
+    assert store.has_api_key() is False
 
 
 def test_stats_path_sits_beside_the_config_file(tmp_path: Path) -> None:
@@ -125,9 +138,9 @@ def test_load_rejects_a_file_with_the_wrong_shape(tmp_path: Path) -> None:
 
 def test_saved_config_round_trips_through_a_new_store(tmp_path: Path) -> None:
     path = tmp_path / "config.json"
-    ConfigStore(path).save(AppConfig(model="round-trip", demo_limit=7))
+    ConfigStore(path).save(AppConfig(model="round-trip", timeout_seconds=7.0))
 
     reloaded = ConfigStore(path).load()
 
     assert reloaded.model == "round-trip"
-    assert reloaded.demo_limit == 7
+    assert reloaded.timeout_seconds == 7.0

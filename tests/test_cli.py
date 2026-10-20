@@ -1,6 +1,7 @@
 """Tests for the Typer command-line interface."""
 
 import json
+from pathlib import Path
 
 import pytest
 from typer.testing import CliRunner
@@ -26,11 +27,34 @@ def fake_response() -> ChatResponse:
     )
 
 
+class FakeConfigStore:
+    """Config store double that reports a stored key."""
+
+    path = Path("/tmp/config.json")
+
+    def user_api_key(self) -> str:
+        return "gsk_live_key_value"
+
+    def api_key_source(self) -> str:
+        return "config file"
+
+    def has_api_key(self) -> bool:
+        return True
+
+
+class FakeStatsStore:
+    """Stats store double with no recorded prompts."""
+
+    path = Path("/tmp/stats.jsonl")
+
+
 class FakeService:
     """Minimal service double that records the calls the CLI makes."""
 
     def __init__(self) -> None:
         self.config = AppConfig(model="test-model")
+        self.config_store = FakeConfigStore()
+        self.stats_store = FakeStatsStore()
         self.asked: list[tuple[str, str | None]] = []
         self.streamed: list[tuple[str, str | None]] = []
         self.benchmarked: list[tuple[list[str], str, int]] = []
@@ -53,18 +77,25 @@ class FakeService:
     def list_models(self):
         return []
 
+    def history(self, limit: int = 10) -> list:
+        return []
+
     def dashboard(self) -> dict[str, object]:
         return {
             "model": "test-model",
-            "quota": {"limit": 10, "used": 1, "remaining": 9},
             "stats": {
                 "requests": 1,
                 "successful": 1,
                 "failed": 0,
                 "average_latency_ms": 12.5,
+                "prompt_tokens": 10,
+                "completion_tokens": 20,
+                "last_model": "test-model",
             },
             "config_path": "/tmp/config.json",
             "stats_path": "/tmp/stats.jsonl",
+            "api_key_source": "config file",
+            "has_api_key": True,
         }
 
     def benchmark(self, models: list[str], prompt: str, rounds: int = 3):
@@ -104,7 +135,6 @@ class FakeService:
 
     def clear_stats(self) -> None:
         self.was_cleared = True
-
 
 @pytest.fixture
 def fake_service(monkeypatch: pytest.MonkeyPatch) -> FakeService:
@@ -160,7 +190,8 @@ def test_dashboard_json_mode_is_machine_readable(fake_service: FakeService) -> N
     assert result.exit_code == 0
     payload = json.loads(result.output)
     assert payload["model"] == "test-model"
-    assert payload["quota"]["remaining"] == 9
+    assert payload["stats"]["requests"] == 1
+    assert payload["has_api_key"] is True
 
 
 def test_batch_requires_two_prompts(fake_service: FakeService) -> None:
@@ -204,32 +235,51 @@ def test_probe_json_mode_returns_the_worker_results(fake_service: FakeService) -
     assert fake_service.probed == [["model-a", "model-b"]]
 
 
-def test_set_key_saves_the_key(fake_service: FakeService) -> None:
-    result = runner.invoke(app, ["set-key", "--api-key", "gsk_live_key_value"])
+def test_config_set_key_saves_the_key(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["config", "set-key", "--api-key", "gsk_live_key_value"])
 
     assert result.exit_code == 0
     assert fake_service.saved_key == "gsk_live_key_value"
 
 
-def test_set_key_can_prompt_for_the_key(fake_service: FakeService) -> None:
-    result = runner.invoke(app, ["set-key"], input="gsk_live_key_value\n")
+def test_config_set_key_can_prompt_for_the_key(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["config", "set-key"], input="gsk_live_key_value\n")
 
     assert result.exit_code == 0
     assert fake_service.saved_key == "gsk_live_key_value"
 
 
-def test_set_model_saves_the_model(fake_service: FakeService) -> None:
-    result = runner.invoke(app, ["set-model", "llama-3.3-70b-versatile"])
+def test_config_set_model_saves_the_model(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["config", "set-model", "llama-3.3-70b-versatile"])
 
     assert result.exit_code == 0
     assert fake_service.saved_model == "llama-3.3-70b-versatile"
 
 
-def test_reset_demo_clears_the_counter(fake_service: FakeService) -> None:
-    result = runner.invoke(app, ["reset-demo"])
+def test_config_show_masks_the_api_key(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["config", "show"])
 
     assert result.exit_code == 0
-    assert fake_service.was_reset is True
+    assert "gsk_..." in result.output
+    assert "gsk_live_key_value" not in result.output
+
+
+def test_config_show_json_mode_is_machine_readable(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "config", "show"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["model"] == "test-model"
+    assert payload["api_key_source"] == "config file"
+
+
+def test_config_path_prints_both_locations(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "config", "path"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["config_path"].endswith("config.json")
+    assert payload["stats_path"].endswith("stats.jsonl")
 
 
 def test_clear_stats_removes_the_history(fake_service: FakeService) -> None:
@@ -237,6 +287,13 @@ def test_clear_stats_removes_the_history(fake_service: FakeService) -> None:
 
     assert result.exit_code == 0
     assert fake_service.was_cleared is True
+
+
+def test_history_json_mode_returns_the_records(fake_service: FakeService) -> None:
+    result = runner.invoke(app, ["--json", "history", "--limit", "3"])
+
+    assert result.exit_code == 0
+    assert json.loads(result.output) == []
 
 
 def test_errors_are_reported_as_json_in_json_mode(monkeypatch: pytest.MonkeyPatch) -> None:

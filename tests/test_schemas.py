@@ -86,7 +86,6 @@ def test_config_normalises_blank_api_key_to_none() -> None:
     assert AppConfig(api_key=" gsk_live ").api_key == "gsk_live"
 
 
-def test_config_reports_remaining_demo_prompts() -> None:
-    config = AppConfig(demo_limit=5, demo_prompts_used=2)
-    assert config.demo_prompts_remaining == 3
-    assert AppConfig(demo_limit=5, demo_prompts_used=9).demo_prompts_remaining == 0
+def test_config_reports_whether_a_key_is_stored() -> None:
+    assert AppConfig().has_api_key is False
+    assert AppConfig(api_key="gsk_live_key_value").has_api_key is True
