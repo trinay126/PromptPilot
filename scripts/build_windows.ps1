@@ -12,7 +12,7 @@ python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 
 Write-Host "Running tests..."
-python -m pytest
+python -m pytest --cov=promptpilot --cov-report=term-missing
 
 Write-Host "Building promptpilot.exe..."
 python -m PyInstaller `
@@ -25,6 +25,13 @@ python -m PyInstaller `
     src\promptpilot\__main__.py
 
 Copy-Item dist\promptpilot.exe "$OutputDir\promptpilot.exe"
+
+Write-Host "Smoke-testing the executable..."
+& "$OutputDir\promptpilot.exe" --version
+if ($LASTEXITCODE -ne 0) {
+    throw "The built executable failed its smoke test."
+}
+
 @{
     product = "PromptPilot"
     version = $Version
