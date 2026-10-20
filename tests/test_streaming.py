@@ -5,12 +5,20 @@ import respx
 from promptpilot.clients import GroqApiClient
 from promptpilot.exceptions import GroqAPIError, SchemaError
 
-STREAM_EVENTS = """data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\ndata: [DONE]\n\n"""
+STREAM_EVENTS = (
+    'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n'
+    'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n'
+    "data: [DONE]\n\n"
+)
 
 
 @respx.mock
 def test_sse_stream_yields_each_delta() -> None:
-    events = """data: {\"choices\":[{\"delta\":{\"content\":\"Hel\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\"lo\"}}]}\n\ndata: [DONE]\n\n"""
+    events = (
+        'data: {"choices":[{"delta":{"content":"Hel"}}]}\n\n'
+        'data: {"choices":[{"delta":{"content":"lo"}}]}\n\n'
+        "data: [DONE]\n\n"
+    )
     respx.post("https://api.test/v1/chat/completions").mock(
         return_value=httpx.Response(200, headers={"content-type": "text/event-stream"}, text=events)
     )
@@ -26,7 +34,9 @@ def test_sse_stream_yields_each_delta() -> None:
 @respx.mock
 def test_stream_request_asks_the_api_for_a_streamed_response() -> None:
     route = respx.post("https://api.test/v1/chat/completions").mock(
-        return_value=httpx.Response(200, headers={"content-type": "text/event-stream"}, text=STREAM_EVENTS)
+        return_value=httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, text=STREAM_EVENTS
+        )
     )
 
     with GroqApiClient("test-key", "test-model", base_url="https://api.test/v1") as client:
@@ -57,7 +67,9 @@ def test_stream_chat_skips_events_without_content() -> None:
 @respx.mock
 def test_malformed_streaming_json_raises_a_schema_error() -> None:
     respx.post("https://api.test/v1/chat/completions").mock(
-        return_value=httpx.Response(200, headers={"content-type": "text/event-stream"}, text="data: {not json}\n\n")
+        return_value=httpx.Response(
+            200, headers={"content-type": "text/event-stream"}, text="data: {not json}\n\n"
+        )
     )
 
     with GroqApiClient("test-key", "test-model", base_url="https://api.test/v1") as client:

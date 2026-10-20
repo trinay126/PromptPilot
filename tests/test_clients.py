@@ -15,7 +15,13 @@ def test_chat_mocks_real_http_boundary() -> None:
                 "id": "chatcmpl-test",
                 "object": "chat.completion",
                 "model": "test-model",
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": "pong"}, "finish_reason": "stop"}],
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "pong"},
+                        "finish_reason": "stop",
+                    }
+                ],
                 "usage": {"prompt_tokens": 2, "completion_tokens": 1, "total_tokens": 3},
             },
         )
@@ -100,7 +106,13 @@ def test_ask_many_sequential_returns_one_response_per_prompt() -> None:
                 "id": "chatcmpl-test",
                 "object": "chat.completion",
                 "model": "test-model",
-                "choices": [{"index": 0, "message": {"role": "assistant", "content": "pong"}, "finish_reason": "stop"}],
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": {"role": "assistant", "content": "pong"},
+                        "finish_reason": "stop",
+                    }
+                ],
             },
         )
     )

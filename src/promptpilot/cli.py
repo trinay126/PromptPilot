@@ -12,8 +12,8 @@ from promptpilot.constants import APP_NAME
 from promptpilot.exceptions import PromptPilotError
 from promptpilot.services import PromptPilotService
 from promptpilot.ui import (
-    console,
     ask_with_spinner,
+    console,
     emit_json,
     response_dict,
     show_batch,
@@ -25,7 +25,12 @@ from promptpilot.ui import (
     stream_to_terminal,
 )
 
-app = typer.Typer(name="promptpilot", help="A Groq AI command-line workbench.", no_args_is_help=True, add_completion=False)
+app = typer.Typer(
+    name="promptpilot",
+    help="A Groq AI command-line workbench.",
+    no_args_is_help=True,
+    add_completion=False,
+)
 
 
 def _version_callback(value: bool) -> None:
@@ -38,7 +43,9 @@ def _version_callback(value: bool) -> None:
 @app.callback()
 def root(
     ctx: typer.Context,
-    json_output: bool = typer.Option(False, "--json", help="Emit one JSON document for automation."),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit one JSON document for automation."
+    ),
     version: bool = typer.Option(
         None,
         "--version",
@@ -73,7 +80,9 @@ def ask(
     ctx: typer.Context,
     prompt: str = typer.Argument(...),
     model: str | None = typer.Option(None, "--model", "-m"),
-    stream: bool = typer.Option(False, "--stream/--no-stream", help="Receive SSE token deltas immediately."),
+    stream: bool = typer.Option(
+        False, "--stream/--no-stream", help="Receive SSE token deltas immediately."
+    ),
 ) -> None:
     """Send one prompt, optionally as a real streamed response."""
     try:
@@ -85,21 +94,31 @@ def ask(
             else:
                 stream_to_terminal(current, prompt, model=model)
             return
-        response = ask_with_spinner(current, prompt, model=model) if not wants_json(ctx) else current.ask(prompt, model=model)
+        if wants_json(ctx):
+            response = current.ask(prompt, model=model)
+        else:
+            response = ask_with_spinner(current, prompt, model=model)
         emit_json(response_dict(response)) if wants_json(ctx) else show_response(response)
     except PromptPilotError as error:
         _fail(ctx, error)
 
 
 @app.command()
-def batch(ctx: typer.Context, prompts: list[str] = typer.Argument(...), model: str | None = typer.Option(None, "--model", "-m")) -> None:
+def batch(
+    ctx: typer.Context,
+    prompts: list[str] = typer.Argument(...),
+    model: str | None = typer.Option(None, "--model", "-m"),
+) -> None:
     """Run multiple prompts concurrently with asyncio.gather."""
     if len(prompts) < 2:
         raise typer.BadParameter("provide at least two prompts")
     try:
         results = service().ask_many(prompts, model=model)
         if wants_json(ctx):
-            emit_json([response_dict(result) if hasattr(result, "text") else {"error": str(result)} for result in results])
+            emit_json([
+                response_dict(result) if hasattr(result, "text") else {"error": str(result)}
+                for result in results
+            ])
         else:
             show_batch(results)
     except PromptPilotError as error:
@@ -111,7 +130,10 @@ def models(ctx: typer.Context) -> None:
     """List the live model catalog returned by Groq."""
     try:
         result = service().list_models()
-        emit_json([item.model_dump() for item in result]) if wants_json(ctx) else show_models(result)
+        if wants_json(ctx):
+            emit_json([item.model_dump() for item in result])
+        else:
+            show_models(result)
     except PromptPilotError as error:
         _fail(ctx, error)
 
@@ -126,7 +148,9 @@ def dashboard(ctx: typer.Context) -> None:
 @app.command()
 def benchmark(
     ctx: typer.Context,
-    models: list[str] = typer.Option(..., "--model", "-m", help="Repeat the benchmark for each model."),
+    models: list[str] = typer.Option(
+        ..., "--model", "-m", help="Repeat the benchmark for each model."
+    ),
     prompt: str = typer.Option("Reply with the single word OK.", "--prompt", "-p"),
     rounds: int = typer.Option(3, "--rounds", min=1, max=20),
 ) -> None:

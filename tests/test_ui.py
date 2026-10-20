@@ -3,8 +3,6 @@
 import json
 from dataclasses import dataclass
 
-import pytest
-
 from promptpilot.benchmark import BenchmarkSample, BenchmarkSummary
 from promptpilot.schemas import ChatResponse, Choice, ChoiceMessage, ModelInfo, Usage
 from promptpilot.ui import (
@@ -115,7 +113,12 @@ def test_show_benchmark_renders_the_latency_columns(capsys) -> None:
 
 
 def test_show_workers_reports_the_error_column(capsys) -> None:
-    show_workers([WorkerResult("item-a", "value", None, 2.0), WorkerResult("item-b", None, "failed", 3.0)])
+    show_workers(
+        [
+            WorkerResult("item-a", "value", None, 2.0),
+            WorkerResult("item-b", None, "failed", 3.0),
+        ]
+    )
 
     captured = capsys.readouterr()
     assert "item-a" in captured.out

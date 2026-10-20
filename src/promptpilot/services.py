@@ -21,7 +21,11 @@ from promptpilot.workers import WorkerResult, run_in_threads
 class PromptPilotService:
     """Facade that keeps CLI code thin and application rules testable."""
 
-    def __init__(self, config_store: ConfigStore | None = None, stats_store: StatsStore | None = None) -> None:
+    def __init__(
+        self,
+        config_store: ConfigStore | None = None,
+        stats_store: StatsStore | None = None,
+    ) -> None:
         self.config_store = config_store or ConfigStore()
         self.config = self.config_store.load()
         stats_path = stats_store.path if stats_store else self.config_store.stats_path()
@@ -36,7 +40,9 @@ class PromptPilotService:
         if not user_key:
             if demo_key and not self.quota.can_use_demo():
                 raise QuotaExceededError("Demo quota exhausted. Run `promptpilot set-key`.")
-            raise ConfigurationError("No Groq key found. Set GROQ_API_KEY or run `promptpilot set-key`.")
+            raise ConfigurationError(
+                "No Groq key found. Set GROQ_API_KEY or run `promptpilot set-key`."
+            )
         return user_key, "user"
 
     def _record(self, prompt: str, response: ChatResponse, elapsed_ms: float, source: str) -> None:
@@ -96,7 +102,13 @@ class PromptPilotService:
         response = ChatResponse(
             id="streamed-local",
             model=target_model,
-            choices=[{"index": 0, "message": {"role": "assistant", "content": text}, "finish_reason": "stop"}],
+            choices=[
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": text},
+                    "finish_reason": "stop",
+                }
+            ],
             usage=None,
         )
         self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
@@ -124,7 +136,9 @@ class PromptPilotService:
                     self.quota.record_success()
         return results
 
-    def ask_many(self, prompts: list[str], model: str | None = None) -> list[ChatResponse | BaseException]:
+    def ask_many(
+        self, prompts: list[str], model: str | None = None
+    ) -> list[ChatResponse | BaseException]:
         """Blocking wrapper around `ask_many_async` for the CLI."""
         return asyncio.run(self.ask_many_async(prompts, model=model))
 

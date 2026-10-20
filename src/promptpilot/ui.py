@@ -20,7 +20,12 @@ console = Console()
 
 
 def show_banner() -> None:
-    console.print(Panel.fit(f"[bold cyan]{APP_NAME}[/bold cyan]\n[dim]Groq AI CLI[/dim]", border_style="cyan"))
+    console.print(
+        Panel.fit(
+            f"[bold cyan]{APP_NAME}[/bold cyan]\n[dim]Groq AI CLI[/dim]",
+            border_style="cyan",
+        )
+    )
 
 
 def emit_json(value: object) -> None:
@@ -47,7 +52,13 @@ def ask_with_spinner(service, prompt: str, model: str | None = None) -> ChatResp
 def show_response(response: ChatResponse) -> None:
     usage = response.usage
     token_text = "unknown" if usage is None else f"{usage.total_tokens} total"
-    console.print(Panel(response.text, title=f"[bold green]{response.model}[/bold green]", border_style="green"))
+    console.print(
+        Panel(
+            response.text,
+            title=f"[bold green]{response.model}[/bold green]",
+            border_style="green",
+        )
+    )
     console.print(f"[dim]Tokens: {token_text}[/dim]")
 
 
@@ -55,7 +66,9 @@ def stream_to_terminal(service, prompt: str, model: str | None = None) -> str:
     """Print each received token immediately and return the final buffer."""
     console.print(f"[bold green]{model or service.config.model}[/bold green]\n")
     print("Assistant: ", end="", flush=True)
-    text = service.stream(prompt, model=model, on_token=lambda token: print(token, end="", flush=True))
+    text = service.stream(
+        prompt, model=model, on_token=lambda token: print(token, end="", flush=True)
+    )
     print("\n")
     return text
 

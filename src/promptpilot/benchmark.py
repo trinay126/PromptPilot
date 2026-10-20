@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from statistics import mean, median
 from time import perf_counter
-from typing import Callable
 
 from promptpilot.clients import GroqApiClient
 
@@ -62,9 +62,13 @@ class BenchmarkRunner:
                 try:
                     with self.client_factory(model) as client:
                         client.ask(prompt, model=model)
-                    samples.append(BenchmarkSample(model, run_number, (perf_counter() - started) * 1000, True))
+                    elapsed_ms = (perf_counter() - started) * 1000
+                    samples.append(BenchmarkSample(model, run_number, elapsed_ms, True))
                 except Exception as error:
-                    samples.append(BenchmarkSample(model, run_number, (perf_counter() - started) * 1000, False, str(error)))
+                    elapsed_ms = (perf_counter() - started) * 1000
+                    samples.append(
+                        BenchmarkSample(model, run_number, elapsed_ms, False, str(error))
+                    )
             successful_latencies = [sample.latency_ms for sample in samples if sample.success]
             ordered = sorted(successful_latencies)
             if not ordered:

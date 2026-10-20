@@ -30,7 +30,9 @@ def stats_store(tmp_path: Path) -> StatsStore:
 
 
 @pytest.fixture
-def service(tmp_path: Path, config_store: ConfigStore, stats_store: StatsStore) -> PromptPilotService:
+def service(
+    tmp_path: Path, config_store: ConfigStore, stats_store: StatsStore
+) -> PromptPilotService:
     """Build a service whose config and JSONL stats stay under pytest's temp path."""
     config_store.save(AppConfig(model="test-model", demo_limit=10))
     return PromptPilotService(config_store, stats_store)

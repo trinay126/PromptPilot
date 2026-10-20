@@ -1,7 +1,15 @@
-from pydantic import ValidationError
 import pytest
+from pydantic import ValidationError
 
-from promptpilot.schemas import AppConfig, ChatMessage, ChatRequest, ChatResponse, Choice, ChoiceMessage, Usage
+from promptpilot.schemas import (
+    AppConfig,
+    ChatMessage,
+    ChatRequest,
+    ChatResponse,
+    Choice,
+    ChoiceMessage,
+    Usage,
+)
 
 
 def test_message_strips_content() -> None:
