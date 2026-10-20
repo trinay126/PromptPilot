@@ -1,5 +1,7 @@
 """Tests for the interactive model picker."""
 
+import pytest
+
 from promptpilot.picker import filter_models, group_by_owner
 from promptpilot.schemas import ModelInfo
 
@@ -194,11 +196,16 @@ class _FakeStdin:
 
 
 def _drive_picker(monkeypatch, keys, models_list):
-    """Run the picker with a scripted key sequence."""
-    import io
-    import termios
-    import tty
+    """Run the picker with a scripted key sequence.
 
+    The interactive picker needs a raw terminal, which only Unix-like systems
+    provide, so these tests are skipped on Windows. The Windows fallback is
+    covered by `test_picker_is_unavailable_without_termios`.
+    """
+    import io
+
+    termios = pytest.importorskip("termios")
+    tty = pytest.importorskip("tty")
     from rich.console import Console
 
     from promptpilot import picker
@@ -212,6 +219,7 @@ def _drive_picker(monkeypatch, keys, models_list):
 
     console = Console(file=io.StringIO(), force_terminal=False, width=100)
     return picker.pick_model(console, models_list, active=None)
+
 
 
 def test_pick_model_returns_the_highlighted_model(monkeypatch) -> None:
