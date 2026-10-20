@@ -11,8 +11,15 @@ class ConfigurationError(PromptPilotError):
     """Raised when configuration is missing or invalid."""
 
 
-class QuotaExceededError(PromptPilotError):
-    """Raised when the demo prompt allowance has been consumed."""
+class MissingAPIKeyError(ConfigurationError):
+    """Raised when no Groq API key is available for the requested operation."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "No Groq API key found.\n"
+            "  Set one with:  promptpilot config set-key\n"
+            "  Or export it:  export GROQ_API_KEY=your_key_here"
+        )
 
 
 class GroqAPIError(PromptPilotError):
@@ -27,6 +34,11 @@ class GroqAPIError(PromptPilotError):
         """Report whether the failure looks transient enough to retry."""
         return self.status_code in RETRYABLE_STATUS_CODES
 
+    @property
+    def is_auth_failure(self) -> bool:
+        """Report whether the API rejected the supplied credentials."""
+        return self.status_code in {401, 403}
+
 
 class SchemaError(PromptPilotError):
     """Raised when a remote response does not match the expected schema."""
@@ -36,7 +48,7 @@ __all__ = [
     "RETRYABLE_STATUS_CODES",
     "ConfigurationError",
     "GroqAPIError",
+    "MissingAPIKeyError",
     "PromptPilotError",
-    "QuotaExceededError",
     "SchemaError",
 ]
