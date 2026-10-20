@@ -1,131 +1,270 @@
-# PromptPilot — Groq AI Command-Line Workbench
+<div align="center">
 
-A production-minded Python CLI that talks directly to Groq's OpenAI-compatible
-REST API. It includes real SSE streaming, an interactive chat session, a model
-benchmark command, personal API-key setup, asynchronous batch prompts,
-concurrent workers, persistent statistics, Pydantic validation, decorators,
-exception handling, file objects, virtual-environment workflow, mocked HTTP
-integration tests, machine-readable `--json` output, pytest coverage, and
-polished Windows executable releases.
+# PromptPilot
 
-This project is intentionally a **CLI application**, not a FastAPI server. A CLI
-does not need to expose an HTTP endpoint of its own; it is already the client.
-PromptPilot sends HTTPS requests to Groq through a small typed API-client layer.
-If you later want a web interface, the existing service layer can be placed
-behind FastAPI without rewriting the Groq integration.
+**A production-minded Groq AI command-line workbench.**
+
+Real SSE streaming, an interactive multi-turn chat, live model benchmarking,
+local statistics, and machine-readable output — wrapped in a polished terminal
+UI and backed by a fully typed, fully tested service layer.
+
+[![Python](https://img.shields.io/badge/python-3.11%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f?logo=open-source-initiative&logoColor=white)](LICENSE)
+[![CI](https://github.com/trinay126/PromptPilot/actions/workflows/release-windows.yml/badge.svg)](https://github.com/trinay126/PromptPilot/actions/workflows/release-windows.yml)
+[![Lint: ruff](https://img.shields.io/badge/lint-ruff-261230?logo=ruff&logoColor=white)](pyproject.toml)
+[![Typed](https://img.shields.io/badge/typing-annotated-2A6DB2?logo=python&logoColor=white)](src/promptpilot/schemas.py)
+
+[Quick start](#quick-start) · [Commands](#command-reference) · [Configuration](#configuration) · [Architecture](#architecture)
+
+</div>
+
+---
+
+## Why PromptPilot
+
+Most "AI CLI" projects are a thin wrapper around a chat endpoint. PromptPilot is
+built like production software instead: a typed API-client layer, a validated
+service boundary, persistent local state, a real error model, and a test suite
+that mocks the HTTP transport so it never needs a key or spends quota.
+
+It is deliberately a **CLI, not a FastAPI server**. A CLI does not need to
+expose an HTTP endpoint of its own — it is already the client. PromptPilot
+speaks HTTPS to Groq directly through `httpx`, so every layer of the request
+(status codes, headers, timeouts, retries, JSON validation) is visible and
+explainable. The service layer is deliberately shaped so a future FastAPI
+adapter could reuse it without rewriting the Groq integration.
+
+| Capability | Why it matters |
+|---|---|
+| **Zero-configuration onboarding** | One guided command stores your key. No bundled key, no demo allowance — you always authenticate as yourself. |
+| **Real streaming** | Server-Sent Events are parsed at the wire level, so tokens render the moment Groq produces them. |
+| **Interactive chat** | A REPL that sends earlier turns back as context, with `/help`, `/history`, `/reset`, and `/exit`. |
+| **Automation-first** | A global `--json` flag turns every command into a clean JSON document for `jq`, CI, and shell pipelines. |
+| **Honest benchmarks** | Average, median, P95, min, and max latency per model, with the fastest one called out. |
+| **Zero-dependency tests** | `respx` mocks the HTTPX transport, so the suite runs offline, for free, in under a second. |
+
+---
 
 ## Table of contents
 
-- [Features](#features)
-- [Architecture](#architecture)
-- [Installation](#installation)
+- [Why PromptPilot](#why-promptpilot)
+- [Screenshots](#screenshots)
+- [Quick start](#quick-start)
+- [Command reference](#command-reference)
+  - [ask](#ask) · [chat](#chat) · [batch](#batch) · [models](#models)
+  - [dashboard](#dashboard) · [history](#history) · [benchmark](#benchmark) · [probe](#probe)
+  - [clear-stats](#clear-stats) · [config](#config)
+- [Automation with `--json`](#automation-with---json)
 - [Configuration](#configuration)
-- [Usage](#usage)
-- [Interactive chat](#interactive-chat)
-- [JSON mode](#json-mode)
-- [Testing](#testing)
-- [Windows executable](#windows-executable)
+- [Architecture](#architecture)
 - [Project layout](#project-layout)
+- [Development](#development)
+- [Windows executable](#windows-executable)
+- [Security model](#security-model)
 - [License](#license)
 
-## Features
+---
 
-| Capability | Where it appears | Why it matters |
-|---|---|---|
-| Typed API client | `clients.py`, `async_client.py` | Direct REST calls over HTTPS with `httpx` |
-| Real SSE streaming | `clients.py`, `ui.py`, `ask --stream` | Incremental output instead of waiting for the full answer |
-| Interactive chat | `chat` command | Multi-turn conversation that keeps earlier turns as context |
-| Async batching | `async_client.py`, `services.ask_many` | `asyncio.gather` runs prompts concurrently in input order |
-| Thread pool | `workers.py`, `probe` command | I/O-bound parallelism contrasted with `asyncio` |
-| Benchmarking | `benchmark.py`, `benchmark` command | Average, median, P95, min, and max latency per model |
-| Pydantic validation | `schemas.py` | Every untrusted payload is validated at the boundary |
-| Decorators | `decorators.py` | Timing and bounded retry as reusable cross-cutting behaviour |
-| Persistence | `config.py`, `stores.py` | JSON configuration and JSONL statistics |
-| Local history | `stores.py`, `history` command | See the prompts you ran on this machine |
-| Automation | `--json` on every command | Composable with Bash, PowerShell, CI, and `jq` |
-| Mocked HTTP tests | `tests/test_clients.py`, `tests/test_streaming.py` | `respx` isolates the transport, so no key is needed |
+## Screenshots
 
-## Architecture
+**A rendered answer, with token accounting in the footer:**
 
 ```text
-Typer CLI commands
-        |
-        v
-PromptPilotService
-        |
-        v
-Sync/Async Groq REST clients
-        |                    |
-        v                    v
-Groq API over HTTPS   ConfigStore + StatsStore
+╭────────────────────────────── llama-3.1-8b-instant ──────────────────────────────╮
+│                                                                                  │
+│  A decorator is a callable that receives another callable and returns a new      │
+│  callable that usually extends its behaviour.                                    │
+│                                                                                  │
+│   import functools                                                               │
+│   import time                                                                    │
+│                                                                                  │
+│   def timed(func):                                                               │
+│       @functools.wraps(func)                                                     │
+│       def wrapper(*args, **kwargs):                                              │
+│           started = time.perf_counter()                                          │
+│           try:                                                                   │
+│               return func(*args, **kwargs)                                       │
+│           finally:                                                               │
+│               print(f"{func.__name__} took {time.perf_counter() -                │
+│   started:.2f}s")                                                                │
+│       return wrapper                                                             │
+│                                                                                  │
+│  Three things make it useful:                                                    │
+│                                                                                  │
+│   1 functools.wraps keeps the original name and docstring                        │
+│   2 the wrapper is transparent to the caller                                     │
+│   3 behaviour is added once, not at every call site                              │
+│                                                                                  │
+╰───────────────────── 18 prompt + 142 completion = 160 total ─────────────────────╯
 ```
 
-The service layer is the extension point. A later FastAPI adapter could call
-`PromptPilotService.ask()` from an endpoint while the CLI keeps using the same
-service. This is dependency inversion in practice: the user interface depends
-on an application service, not on raw HTTP code.
+**Live streaming, token by token:**
 
-## Installation
+```text
+llama-3.1-8b-instant
+
+Caching turns a slow query into a fast one.
+```
+
+**The live model catalog, with your active model marked:**
+
+```text
+         Available Groq models
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
+┃   ┃ Model ID                ┃ Owner  ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
+│ * │ llama-3.1-8b-instant    │ groq   │
+│   │ llama-3.3-70b-versatile │ groq   │
+│   │ openai/gpt-oss-120b     │ openai │
+└───┴────────────────━━━━━━━━─┴────────┘
+* active model   llama-3.1-8b-instant
+```
+
+**The local dashboard:**
+
+```text
+                          PromptPilot dashboard
+┌─────────────────────┬─────────────────────────────────────────────────┐
+│ API key             │ configured  (environment (GROQ_API_KEY))        │
+│ Preferred model     │ llama-3.1-8b-instant                            │
+│ Requests            │ 12                                              │
+│ Successful          │ 12                                              │
+│ Failed              │ 0                                               │
+│ Average latency     │ 52.86 ms                                        │
+│ Tokens (prompt)     │ 132                                             │
+│ Tokens (completion) │ 613                                             │
+│ Config file         │ ~/.config/promptpilot/config.json               │
+│ Stats file          │ ~/.config/promptpilot/stats.jsonl               │
+└─────────────────────┴─────────────────────────────────────────────────┘
+```
+
+**A latency benchmark across models:**
+
+```text
+                                Groq model benchmark
+┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
+┃ Model           ┃ Success ┃ Average  ┃ Median   ┃ P95      ┃ Min      ┃ Max      ┃
+┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
+│ llama-3.1-8b-i… │ 2/2     │ 46.66 ms │ 46.66 ms │ 15.88 ms │ 15.88 ms │ 77.45 ms │
+│ llama-3.3-70b-… │ 2/2     │ 18.58 ms │ 18.58 ms │ 17.76 ms │ 17.76 ms │ 19.41 ms │
+└─────────────────┴─────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
+Fastest: llama-3.3-70b-versatile
+```
+
+**A friendly error, instead of a traceback:**
+
+```text
+╭─────────────────────────────────── Error ────────────────────────────────────╮
+│                                                                              │
+│  No Groq API key found.                                                      │
+│    Set one with:  promptpilot config set-key                                 │
+│    Or export it:  export GROQ_API_KEY=your_key_here                          │
+│                                                                              │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+---
+
+## Quick start
+
+**1. Install**
 
 ```bash
+git clone https://github.com/trinay126/PromptPilot.git
+cd PromptPilot
 python -m venv .venv
-source .venv/bin/activate        # Windows: .\.venv\Scripts\Activate.ps1
+source .venv/bin/activate          # Windows: .\.venv\Scripts\Activate.ps1
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
 
-## Configuration
+**2. Add your key**
 
-PromptPilot uses **your own Groq API key**. There is no bundled key and no demo
-allowance — you always authenticate as yourself.
-
-Create a free key at [console.groq.com/keys](https://console.groq.com/keys),
-then store it with the guided command:
+Create a free key at [console.groq.com/keys](https://console.groq.com/keys), then:
 
 ```bash
 promptpilot config set-key
 ```
 
-The key is written to an OS-appropriate per-user directory (`%APPDATA%` on
-Windows, `~/Library/Application Support` on macOS, `$XDG_CONFIG_HOME` on
-Linux) and is never committed to the repository. Statistics are written next to
-it as `stats.jsonl`.
+The key is stored in your user config directory and is never written to the
+repository. You can also export `GROQ_API_KEY` instead — PromptPilot prefers a
+saved key and falls back to the environment.
 
-You can also export the key as an environment variable instead:
-
-| Variable | Purpose |
-|---|---|
-| `GROQ_API_KEY` | Your personal Groq key |
-| `PROMPTPILOT_MODEL` | Default model when `--model` is omitted |
-| `PROMPTPILOT_TIMEOUT_SECONDS` | HTTP timeout for every request |
-
-Inspect what is currently active with `promptpilot config show`; the key is
-always masked.
-
-## Usage
+**3. Say something**
 
 ```bash
-promptpilot ask "Explain Python generators in three examples"
-promptpilot ask --stream "Explain decorators as if I am preparing for an interview"
-promptpilot batch "Summarise dependency injection" "Compare threads and asyncio"
-promptpilot models
-promptpilot dashboard
-promptpilot history
-promptpilot benchmark --model llama-3.1-8b-instant --model llama-3.3-70b-versatile --rounds 3
-promptpilot probe llama-3.1-8b-instant llama-3.3-70b-versatile
+promptpilot ask "Explain Python decorators in one paragraph."
 ```
 
-`promptpilot --help` lists every command, and `promptpilot <command> --help`
-documents its options.
+> **Note** — PromptPilot uses **your own** API key. There is no bundled key and
+> no demo allowance, so nothing you run is metered against someone else's
+> account.
 
-## Interactive chat
+---
 
-`promptpilot chat` opens a REPL that remembers the conversation, so follow-up
-questions include the earlier turns as context:
+## Command reference
+
+Run `promptpilot --help` for the full list, or `promptpilot <command> --help`
+for the options of a single command.
 
 ```text
-you > Explain what a decorator is
-you > Now show me one with a timer
+ Usage: promptpilot [OPTIONS] COMMAND [ARGS]...
+
+ PromptPilot — Groq AI command-line workbench.
+
+╭─ Options ────────────────────────────────────────────────────────────────────╮
+│ --json                Emit one JSON document for automation.                 │
+│ --version             Show the installed version and exit.                   │
+│ --install-completion  Install completion for the current shell.              │
+│ --show-completion     Show completion for the current shell.                 │
+│ --help                Show this message and exit.                            │
+╰──────────────────────────────────────────────────────────────────────────────╯
+╭─ Commands ───────────────────────────────────────────────────────────────────╮
+│ ask          Send one prompt and print the answer.                           │
+│ chat         Start an interactive chat session that remembers the            │
+│              conversation.                                                   │
+│ batch        Run multiple prompts concurrently with asyncio.gather.          │
+│ models       List the live model catalog returned by Groq.                   │
+│ dashboard    Show local configuration and usage statistics.                  │
+│ history      Show the most recent prompts recorded on this machine.          │
+│ benchmark    Compare end-to-end latency for one prompt across models.        │
+│ probe        Demonstrate a thread pool with independent tiny API requests.   │
+│ clear-stats  Delete the local statistics history.                            │
+│ config       Manage your local PromptPilot configuration.                    │
+╰──────────────────────────────────────────────────────────────────────────────╯
+```
+
+### `ask`
+
+Send one prompt and print the answer.
+
+```bash
+promptpilot ask "Summarise the CAP theorem in two sentences"
+promptpilot ask --model llama-3.3-70b-versatile "What is a monad?"
+promptpilot ask --stream "Write a haiku about caching"
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--model`, `-m` | your configured model | Model to use for this request |
+| `--stream` / `--no-stream` | `--no-stream` | Print SSE deltas the moment they arrive |
+
+Answers are rendered as **Markdown**, so code blocks, lists, and tables from
+the model come back formatted rather than as raw text.
+
+### `chat`
+
+Open an interactive session that keeps the conversation in context — a
+follow-up question includes the earlier turns.
+
+```bash
+promptpilot chat
+promptpilot chat --model llama-3.3-70b-versatile
+```
+
+```text
+you > What is a decorator?
+you > Now show me one with a timer.
 you > /reset
 you > /exit
 ```
@@ -137,31 +276,304 @@ you > /exit
 | `/reset` | Clear the conversation history |
 | `/exit` | Leave the session |
 
-## JSON mode
+### `batch`
 
-The global `--json` flag replaces Rich tables and spinners with a single valid
-JSON document on stdout, which makes the CLI safe to pipe into other programs:
+Run several prompts concurrently with `asyncio.gather`. Results keep the order
+you passed the prompts in.
+
+```bash
+promptpilot batch \
+  "Summarise dependency injection in Python" \
+  "Give me a short example of a decorator" \
+  "Compare threads and asyncio for network calls"
+```
+
+### `models`
+
+List the live catalog Groq returns for your account. Your configured model is
+marked with `*`.
+
+```bash
+promptpilot models
+```
+
+### `dashboard`
+
+Show the resolved configuration and the local usage statistics — request
+counts, token totals, average latency, and the file locations in use.
+
+```bash
+promptpilot dashboard
+```
+
+### `history`
+
+Show the prompts you have run on this machine, newest last, with latency and
+status. The record is stored in `stats.jsonl`.
+
+```bash
+promptpilot history
+promptpilot history --limit 25
+```
+
+### `benchmark`
+
+Compare end-to-end latency for the same prompt across models. This issues a
+real request per model per round, so keep `--rounds` small while exploring.
+
+```bash
+promptpilot benchmark \
+  --model llama-3.1-8b-instant \
+  --model llama-3.3-70b-versatile \
+  --rounds 3 \
+  --prompt "Reply with the single word OK."
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--model`, `-m` | *required* | Repeat the benchmark for each model |
+| `--prompt`, `-p` | `Reply with the single word OK.` | Prompt to send each round |
+| `--rounds` | `3` | Repeats per model (1–20) |
+
+Latency depends on network conditions, rate limits, and model warm-up, so
+treat the output as an engineering observation rather than a permanent ranking.
+
+### `probe`
+
+Send one tiny request per model from a thread pool — a side-by-side contrast
+with the `asyncio` implementation used by `batch`.
+
+```bash
+promptpilot probe llama-3.1-8b-instant llama-3.3-70b-versatile
+```
+
+### `clear-stats`
+
+Delete the local statistics history.
+
+```bash
+promptpilot clear-stats
+```
+
+### `config`
+
+Manage your local configuration.
+
+```bash
+promptpilot config set-key          # guided, hidden input
+promptpilot config set-key --api-key gsk_...
+promptpilot config set-model llama-3.3-70b-versatile
+promptpilot config show             # key is always masked
+promptpilot config path             # where config and stats live
+```
+
+---
+
+## Automation with `--json`
+
+The global `--json` flag swaps the Rich interface for plain JSON on stdout, so
+the CLI is safe to pipe into other programs. It works with every command.
 
 ```bash
 promptpilot --json ask "What is dependency injection?" > answer.json
 promptpilot --json dashboard | jq .stats
-promptpilot --json models > models.json
+promptpilot --json models | jq -r '.[] | .id'
+promptpilot --json history | jq '.[0].model'
 ```
 
-A streamed JSON request buffers the final text and still emits one parseable
-document, which is the only reliable contract for automation. In `--json` mode
-`chat` reads one prompt per line from stdin and emits one compact JSON object
-per line, which is easy to pipe into `jq`, a log collector, or another program.
+```json
+{
+  "model": "llama-3.1-8b-instant",
+  "text": "A decorator wraps a callable to add reusable behaviour.",
+  "usage": {
+    "prompt_tokens": 18,
+    "completion_tokens": 12,
+    "total_tokens": 30
+  }
+}
+```
 
-## Testing
+`chat` in JSON mode is non-interactive: it reads one prompt per line from
+stdin and emits one compact JSON object per line, which is easy to stream into
+a log collector.
 
 ```bash
-python -m pytest
-python -m pytest --cov=promptpilot --cov-report=term-missing
+printf 'first question\nsecond question\n' | promptpilot --json chat
 ```
 
-The HTTP boundary is mocked with `respx`, so the suite never contacts Groq and
-never needs a real key.
+```json
+{"model":"llama-3.1-8b-instant","text":"...","usage":{"prompt_tokens":18,"completion_tokens":12,"total_tokens":30}}
+{"model":"llama-3.1-8b-instant","text":"...","usage":{"prompt_tokens":18,"completion_tokens":12,"total_tokens":30}}
+```
+
+Errors are reported as JSON too, and always exit with status `1`:
+
+```json
+{
+  "error": "No Groq API key found.",
+  "type": "MissingAPIKeyError"
+}
+```
+
+---
+
+## Configuration
+
+PromptPilot resolves settings in this order: **saved config file** → **environment
+variable** → **built-in default**.
+
+| Variable | Purpose | Default |
+|---|---|---|
+| `GROQ_API_KEY` | Your personal Groq key | — |
+| `PROMPTPILOT_MODEL` | Model used when `--model` is omitted | `llama-3.1-8b-instant` |
+| `PROMPTPILOT_TIMEOUT_SECONDS` | HTTP timeout for every request | `45` |
+
+You can also copy `.env.example` to `.env` and edit it — `python-dotenv` loads
+it automatically.
+
+**Configuration file** — `promptpilot config path` prints the exact locations:
+
+| Platform | Path |
+|---|---|
+| Windows | `%APPDATA%\promptpilot\config.json` |
+| macOS | `~/Library/Application Support/promptpilot/config.json` |
+| Linux | `$XDG_CONFIG_HOME/promptpilot/config.json` (or `~/.config/…`) |
+
+```json
+{
+  "api_key": "gsk_...",
+  "model": "llama-3.1-8b-instant",
+  "timeout_seconds": 45.0
+}
+```
+
+**Statistics file** — `stats.jsonl` sits next to the config file and holds one
+validated JSON object per request. This is what `dashboard` and `history` read.
+
+---
+
+## Architecture
+
+```text
+                       ┌──────────────────────────────┐
+   promptpilot  ─────► │          cli.py              │  Typer commands
+                       │  (config group, chat, ask…)  │
+                       └──────────────┬───────────────┘
+                                      │
+                       ┌──────────────▼───────────────┐
+                       │       services.py             │  application rules
+                       │  PromptPilotService           │  (key resolution,
+                       │                               │   stats, quotas-free)
+                       └───┬───────────────────────┬───┘
+                           │                       │
+            ┌──────────────▼─────────┐   ┌─────────▼─────────┐
+            │  clients.py            │   │  async_client.py  │
+            │  GroqApiClient         │   │  AsyncGroq…       │
+            │  + SSE streaming        │   │  + gather batching│
+            └──────────────┬─────────┘   └─────────┬─────────┘
+                           │                       │
+                           └───────────┬───────────┘
+                                       │
+                         ┌─────────────▼──────────────┐
+                         │   Groq REST API (HTTPS)     │
+                         └─────────────────────────────┘
+
+     config.py ──► AppConfig (JSON)          stores.py ──► PromptStat (JSONL)
+```
+
+| Layer | Responsibility |
+|---|---|
+| `cli.py` | Parsing, output mode, error translation. No business rules. |
+| `ui.py` | Every piece of Rich rendering. Pure presentation. |
+| `services.py` | The application boundary: key resolution, statistics, orchestration. |
+| `clients.py` / `async_client.py` | The HTTP boundary: headers, timeouts, retries, SSE parsing, schema validation. |
+| `schemas.py` | Pydantic models that validate every untrusted payload. |
+| `decorators.py` | `timed` and bounded retry as reusable cross-cutting behaviour. |
+| `stores.py` / `config.py` | Persistence: JSONL statistics and JSON configuration. |
+| `workers.py` | Thread-pool execution for I/O-bound work. |
+| `benchmark.py` | Latency measurement and percentile aggregation. |
+
+**Why the split matters:** the CLI can be replaced without touching the HTTP
+code, and the HTTP code can be replaced without touching the CLI. Both are
+covered by tests that never open a socket.
+
+---
+
+## Project layout
+
+```text
+PromptPilot/
+├── pyproject.toml                 # packaging, dependencies, ruff + pytest config
+├── README.md
+├── LICENSE                        # MIT
+├── .env.example
+├── src/promptpilot/
+│   ├── __init__.py                # package metadata
+│   ├── __main__.py                # `python -m promptpilot`
+│   ├── cli.py                     # Typer commands and the `config` sub-app
+│   ├── ui.py                      # Rich theme, panels, tables, JSON serializers
+│   ├── services.py                # PromptPilotService — the application facade
+│   ├── clients.py                 # sync REST client + SSE streaming
+│   ├── async_client.py            # async REST client + gather batching
+│   ├── benchmark.py               # latency benchmark primitives
+│   ├── workers.py                 # thread-pool utilities
+│   ├── config.py                  # JSON config + cross-platform paths
+│   ├── stores.py                  # JSONL statistics store
+│   ├── schemas.py                 # Pydantic request/response models
+│   ├── decorators.py              # timing and retry decorators
+│   ├── utils.py                   # small pure helpers
+│   ├── constants.py               # shared defaults
+│   └── exceptions.py              # domain error hierarchy
+├── tests/                         # 156 tests, no network, no API key
+│   ├── conftest.py
+│   ├── test_schemas.py            # validation and constraints
+│   ├── test_config.py             # config round-trip and env overrides
+│   ├── test_stores.py             # JSONL persistence
+│   ├── test_utils.py              # pure helpers
+│   ├── test_decorators.py         # timing and retry policy
+│   ├── test_clients.py            # mocked HTTP boundary
+│   ├── test_streaming.py          # SSE parsing
+│   ├── test_async_client.py       # async client and gather
+│   ├── test_workers.py            # thread pool
+│   ├── test_benchmark.py          # latency aggregation
+│   ├── test_service.py            # application rules
+│   ├── test_cli.py                # command dispatch and JSON output
+│   ├── test_chat.py               # interactive session
+│   └── test_ui.py                 # presentation layer
+├── scripts/
+│   └── build_windows.ps1          # PyInstaller release bundle
+└── .github/workflows/
+    └── release-windows.yml        # test matrix + release publishing
+```
+
+---
+
+## Development
+
+```bash
+python -m pip install -e ".[dev]"
+
+python -m pytest                                    # run the suite
+python -m pytest --cov=promptpilot --cov-report=term-missing
+python -m pytest tests/test_streaming.py -v          # a single module
+
+ruff check src tests                                 # lint
+ruff check src tests --fix                           # lint and autofix
+```
+
+The suite is fast and hermetic: `respx` intercepts HTTPX at the transport
+level, so **no network access and no API key are required**. That makes it
+safe to run on every commit and in CI.
+
+Current status:
+
+```text
+156 passed
+88% coverage
+ruff: all checks passed
+```
+
+---
 
 ## Windows executable
 
@@ -169,31 +581,43 @@ never needs a real key.
 .\scripts\build_windows.ps1
 ```
 
-The script runs the tests, builds `promptpilot.exe` with PyInstaller, and
-produces a versioned bundle containing the executable, a SHA-256 checksum file,
-and a release manifest. PyInstaller is not a cross-compiler, so build on
-Windows.
-
-## Project layout
+The script installs dependencies, runs the test suite, builds `promptpilot.exe`
+with PyInstaller, smoke-tests the binary, and produces a versioned bundle:
 
 ```text
-src/promptpilot/
-├── cli.py            # Typer commands and the config sub-app
-├── ui.py             # Rich presentation and JSON serializers
-├── services.py       # Application service facade
-├── clients.py        # Synchronous REST client with SSE streaming
-├── async_client.py   # Asynchronous client with gather-based batching
-├── benchmark.py      # Latency benchmark primitives
-├── workers.py        # Thread-pool utilities
-├── config.py         # JSON configuration and platform paths
-├── stores.py         # JSONL statistics store
-├── schemas.py        # Pydantic request/response models
-├── decorators.py     # Timing and retry decorators
-├── utils.py          # Small pure helpers
-├── constants.py      # Shared defaults
-└── exceptions.py     # Domain error hierarchy
+artifacts/
+└── promptpilot-v1.0.0-windows-x64/
+    ├── promptpilot.exe
+    ├── release-manifest.json
+    └── SHA256SUMS.txt
 ```
+
+PyInstaller is not a cross-compiler, so the build runs on Windows. The
+`release-windows.yml` workflow tests Python 3.11, 3.12, and 3.13 on every pull
+request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
+
+---
+
+## Security model
+
+- **Your key never leaves your machine** except in the `Authorization` header
+  sent to Groq. It is never logged, never printed unmasked, and never committed.
+- `promptpilot config show` always masks the key (`gsk_...7890`).
+- The repository ships **no key of any kind** — there is no bundled demo key
+  to extract from a released binary.
+- `.env` and `.env.*` are git-ignored, and only `.env.example` is tracked.
+- A key stored in the config file is written with the same permissions as the
+  rest of your user config directory.
+
+---
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+Released under the [MIT License](LICENSE).
+
+```text
+MIT License
+Copyright (c) 2026 Chadalavada Trinay Sai
+```
+
+Built by [Chadalavada Trinay Sai](https://github.com/trinay126).
