@@ -1,4 +1,4 @@
-"""Application service layer coordinating API calls, quota, stats, and benchmarks."""
+"""Application service layer coordinating API calls, stats, and benchmarks."""
 
 from __future__ import annotations
 
@@ -10,12 +10,14 @@ from promptpilot.async_client import AsyncGroqApiClient
 from promptpilot.benchmark import BenchmarkRunner, BenchmarkSummary
 from promptpilot.clients import GroqApiClient
 from promptpilot.config import ConfigStore
-from promptpilot.exceptions import ConfigurationError, QuotaExceededError
-from promptpilot.quota import QuotaManager
-from promptpilot.schemas import ChatResponse, ModelInfo, PromptStat
+from promptpilot.constants import DEFAULT_SYSTEM_PROMPT
+from promptpilot.exceptions import ConfigurationError, MissingAPIKeyError
+from promptpilot.schemas import ChatMessage, ChatResponse, ModelInfo, PromptStat
 from promptpilot.stores import StatsStore
 from promptpilot.utils import clean_prompt
 from promptpilot.workers import WorkerResult, run_in_threads
+
+MAX_HISTORY_MESSAGES = 20
 
 
 class PromptPilotService:
@@ -30,22 +32,20 @@ class PromptPilotService:
         self.config = self.config_store.load()
         stats_path = stats_store.path if stats_store else self.config_store.stats_path()
         self.stats_store = stats_store or StatsStore(stats_path)
-        self.quota = QuotaManager(self.config, self.config_store.save)
 
-    def _resolve_key(self) -> tuple[str, str]:
-        demo_key = self.config_store.demo_api_key()
-        if demo_key and self.quota.can_use_demo():
-            return demo_key, "demo"
-        user_key = self.config_store.user_api_key()
-        if not user_key:
-            if demo_key and not self.quota.can_use_demo():
-                raise QuotaExceededError("Demo quota exhausted. Run `promptpilot set-key`.")
-            raise ConfigurationError(
-                "No Groq key found. Set GROQ_API_KEY or run `promptpilot set-key`."
-            )
-        return user_key, "user"
+    def _resolve_key(self) -> str:
+        """Return the user's own API key, or explain how to provide one."""
+        key = self.config_store.user_api_key()
+        if not key:
+            raise MissingAPIKeyError()
+        return key
 
-    def _record(self, prompt: str, response: ChatResponse, elapsed_ms: float, source: str) -> None:
+    def _record(
+        self,
+        prompt: str,
+        response: ChatResponse,
+        elapsed_ms: float,
+    ) -> None:
         usage = response.usage
         self.stats_store.record(
             PromptStat(
@@ -55,7 +55,7 @@ class PromptPilotService:
                 prompt_tokens=usage.prompt_tokens if usage else 0,
                 completion_tokens=usage.completion_tokens if usage else 0,
                 latency_ms=elapsed_ms,
-                source=source,
+                prompt_preview=prompt[:120],
                 success=True,
             )
         )
@@ -64,7 +64,7 @@ class PromptPilotService:
         cleaned = clean_prompt(prompt)
         if not cleaned:
             raise ValueError("prompt cannot be blank")
-        key, source = self._resolve_key()
+        key = self._resolve_key()
         target_model = model or self.config.model
         started = time.perf_counter()
         with GroqApiClient(
@@ -73,9 +73,34 @@ class PromptPilotService:
             timeout_seconds=self.config.timeout_seconds,
         ) as client:
             response = client.ask(cleaned, model=target_model)
-        if source == "demo":
-            self.quota.record_success()
-        self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
+        self._record(cleaned, response, (time.perf_counter() - started) * 1000)
+        return response
+
+    def ask_with_history(
+        self,
+        prompt: str,
+        history: list[ChatMessage],
+        model: str | None = None,
+    ) -> ChatResponse:
+        """Send one prompt with earlier turns included as context."""
+        cleaned = clean_prompt(prompt)
+        if not cleaned:
+            raise ValueError("prompt cannot be blank")
+        key = self._resolve_key()
+        target_model = model or self.config.model
+        messages = [ChatMessage(role="system", content=DEFAULT_SYSTEM_PROMPT)]
+        messages.extend(history[-MAX_HISTORY_MESSAGES:])
+        messages.append(ChatMessage(role="user", content=cleaned))
+        started = time.perf_counter()
+        with GroqApiClient(
+            api_key=key,
+            model=target_model,
+            timeout_seconds=self.config.timeout_seconds,
+        ) as client:
+            response = client.chat(
+                client.build_request(messages, model=target_model)
+            )
+        self._record(cleaned, response, (time.perf_counter() - started) * 1000)
         return response
 
     def stream(
@@ -88,7 +113,7 @@ class PromptPilotService:
         cleaned = clean_prompt(prompt)
         if not cleaned:
             raise ValueError("prompt cannot be blank")
-        key, source = self._resolve_key()
+        key = self._resolve_key()
         target_model = model or self.config.model
         started = time.perf_counter()
         with GroqApiClient(
@@ -97,8 +122,6 @@ class PromptPilotService:
             timeout_seconds=self.config.timeout_seconds,
         ) as client:
             text = client.stream(cleaned, model=target_model, on_token=on_token)
-        if source == "demo":
-            self.quota.record_success()
         response = ChatResponse(
             id="streamed-local",
             model=target_model,
@@ -111,7 +134,7 @@ class PromptPilotService:
             ],
             usage=None,
         )
-        self._record(cleaned, response, (time.perf_counter() - started) * 1000, source)
+        self._record(cleaned, response, (time.perf_counter() - started) * 1000)
         return text
 
     async def ask_many_async(
@@ -122,19 +145,14 @@ class PromptPilotService:
         """Send many prompts concurrently and keep the input ordering."""
         if not prompts:
             return []
-        key, source = self._resolve_key()
+        key = self._resolve_key()
         target_model = model or self.config.model
         async with AsyncGroqApiClient(
                 api_key=key,
                 model=target_model,
                 timeout_seconds=self.config.timeout_seconds,
             ) as client:
-            results = await client.ask_many(prompts, model=target_model)
-        if source == "demo":
-            for result in results:
-                if isinstance(result, ChatResponse) and self.quota.can_use_demo():
-                    self.quota.record_success()
-        return results
+            return await client.ask_many(prompts, model=target_model)
 
     def ask_many(
         self, prompts: list[str], model: str | None = None
@@ -143,7 +161,7 @@ class PromptPilotService:
         return asyncio.run(self.ask_many_async(prompts, model=model))
 
     def list_models(self) -> list[ModelInfo]:
-        key, _ = self._resolve_key()
+        key = self._resolve_key()
         with GroqApiClient(
             api_key=key,
             model=self.config.model,
@@ -151,8 +169,10 @@ class PromptPilotService:
         ) as client:
             return client.list_models().data
 
-    def benchmark(self, models: list[str], prompt: str, rounds: int = 3) -> list[BenchmarkSummary]:
-        key, _ = self._resolve_key()
+    def benchmark(
+        self, models: list[str], prompt: str, rounds: int = 3
+    ) -> list[BenchmarkSummary]:
+        key = self._resolve_key()
         return BenchmarkRunner(
             lambda model: GroqApiClient(
                 api_key=key,
@@ -164,10 +184,11 @@ class PromptPilotService:
     def dashboard(self) -> dict[str, object]:
         return {
             "model": self.config.model,
-            "quota": self.quota.summary(),
             "stats": self.stats_store.summary(),
             "config_path": str(self.config_store.path),
             "stats_path": str(self.stats_store.path),
+            "api_key_source": self.config_store.api_key_source(),
+            "has_api_key": self.config_store.has_api_key(),
         }
 
     def set_user_key(self, api_key: str) -> None:
@@ -184,11 +205,12 @@ class PromptPilotService:
         self.config.model = cleaned
         self.config_store.save(self.config)
 
-    def reset_demo(self) -> None:
-        self.quota.reset()
-
     def clear_stats(self) -> None:
         self.stats_store.clear()
+
+    def history(self, limit: int = 10) -> list[PromptStat]:
+        """Return the most recent recorded prompts, newest last."""
+        return self.stats_store.recent(limit=limit)
 
     def probe_models(self, models: list[str]) -> list[WorkerResult]:
         def probe(model: str) -> str:
@@ -196,4 +218,4 @@ class PromptPilotService:
         return run_in_threads(models, probe, max_workers=min(4, max(1, len(models))))
 
 
-__all__ = ["PromptPilotService"]
+__all__ = ["MAX_HISTORY_MESSAGES", "PromptPilotService"]
