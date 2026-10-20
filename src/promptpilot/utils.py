@@ -6,7 +6,6 @@ import os
 import re
 from collections.abc import Iterable
 
-
 ANSI_ESCAPE = re.compile(r"\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])")
 
 
@@ -48,6 +47,11 @@ def compact_number(value: int | float) -> str:
     return f"{value / divisor:.1f}{suffix}"
 
 
+def format_latency(value_ms: float) -> str:
+    """Format a millisecond duration for tables and log lines."""
+    return f"{value_ms:.2f} ms"
+
+
 def mean(values: Iterable[float]) -> float:
     """Compute a safe arithmetic mean using a generator and a loop."""
     numbers = list(values)
@@ -61,3 +65,15 @@ def terminal_width(default: int = 100) -> int:
         return max(40, int(raw_width))
     except ValueError:
         return default
+
+
+__all__ = [
+    "ANSI_ESCAPE",
+    "clean_prompt",
+    "compact_number",
+    "format_latency",
+    "mask_secret",
+    "mean",
+    "terminal_width",
+    "truncate",
+]
