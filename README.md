@@ -1011,6 +1011,28 @@ request, and a `v*.*.*` tag publishes the signed bundle to a GitHub release.
 ## Troubleshooting
 
 <details>
+<summary><strong>"promptpilot: command not found"</strong></summary>
+
+The tool is installed inside the project virtual environment, which is only on
+your `PATH` while that environment is active. Either activate it:
+
+```bash
+cd ~/path/to/PromptPilot
+source .venv/bin/activate
+promptpilot --version
+```
+
+…or install it once, system-wide, with [`pipx`](https://pipx.pypa.io/) so it
+works from any directory without activating anything:
+
+```bash
+pipx install git+https://github.com/trinay126/PromptPilot.git
+```
+
+If `pipx ensurepath` is required, run it and restart your shell afterwards.
+</details>
+
+<details>
 <summary><strong>The CLI says "No Groq API key found"</strong></summary>
 
 You have not stored a key yet. Run `promptpilot config set-key`, or export
