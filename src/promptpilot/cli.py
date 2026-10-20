@@ -78,6 +78,9 @@ class PromptPilotGroup(typer.core.TyperGroup):
         kwargs.setdefault("standalone_mode", False)
         try:
             result = super().main(*args, **kwargs)
+        except click_exceptions.NoArgsIsHelpError:
+            # Typer already rendered the help page, so nothing left to show.
+            raise SystemExit(0) from None
         except click_exceptions.UsageError as error:
             show_usage_error(error.format_message(), _command_name(error))
             raise SystemExit(error.exit_code) from None
