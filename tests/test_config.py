@@ -105,3 +105,29 @@ def test_stats_path_sits_beside_the_config_file(tmp_path: Path) -> None:
     store = ConfigStore(tmp_path / "config.json")
 
     assert store.stats_path() == tmp_path / "stats.jsonl"
+
+
+def test_store_creates_the_parent_directory(tmp_path: Path) -> None:
+    path = tmp_path / "nested" / "deeper" / "config.json"
+
+    ConfigStore(path)
+
+    assert path.parent.is_dir()
+
+
+def test_load_rejects_a_file_with_the_wrong_shape(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    path.write_text('{"timeout_seconds": "soon"}', encoding="utf-8")
+
+    with pytest.raises(ConfigurationError):
+        ConfigStore(path).load()
+
+
+def test_saved_config_round_trips_through_a_new_store(tmp_path: Path) -> None:
+    path = tmp_path / "config.json"
+    ConfigStore(path).save(AppConfig(model="round-trip", demo_limit=7))
+
+    reloaded = ConfigStore(path).load()
+
+    assert reloaded.model == "round-trip"
+    assert reloaded.demo_limit == 7
