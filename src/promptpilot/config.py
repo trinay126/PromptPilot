@@ -38,6 +38,10 @@ class ConfigStore:
             root = Path(os.getenv("XDG_CONFIG_HOME", Path.home() / ".config"))
         return root / APP_NAME.lower() / "config.json"
 
+    def stats_path(self) -> Path:
+        """Return the JSONL statistics file that lives beside the config file."""
+        return self.path.with_name("stats.jsonl")
+
     def load(self) -> AppConfig:
         """Load valid JSON, or create a default configuration."""
         if not self.path.exists():
@@ -83,3 +87,6 @@ class ConfigStore:
     def demo_api_key() -> str | None:
         """Read the optional private-build demo key without persisting it."""
         return os.getenv("PROMPTPILOT_DEMO_API_KEY")
+
+
+__all__ = ["ConfigStore"]
