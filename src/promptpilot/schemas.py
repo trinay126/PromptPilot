@@ -11,12 +11,14 @@ from promptpilot.constants import DEFAULT_MODEL, DEFAULT_TIMEOUT_SECONDS
 
 Role = Literal["system", "user", "assistant"]
 
+
 class ChatMessage(BaseModel):
-    """A message accepted by groq's chat-completons API."""
+    """A message accepted by Groq's chat-completions API."""
+
     model_config = ConfigDict(extra="ignore")
 
-    role : Role
-    content : Annotated[str, Field(min_length=1, max_lenght=100_000)]
+    role: Role
+    content: Annotated[str, Field(min_length=1, max_length=100_000)]
 
     @field_validator("content")
     @classmethod
@@ -26,15 +28,18 @@ class ChatMessage(BaseModel):
             raise ValueError("message content cannot be blank")
         return cleaned
 
-class chatRequest(BaseModel):
+
+class ChatRequest(BaseModel):
     """Validated request body sent to the Groq REST endpoint."""
+
     model_config = ConfigDict(extra="forbid")
 
-    model: str = Field(default=DEFAULT_MODEL, min_length=2, max_length=200) 
+    model: str = Field(default=DEFAULT_MODEL, min_length=2, max_length=200)
     messages: list[ChatMessage] = Field(min_length=1, max_length=100)
-    temparature: float = Field(default=0.2, ge=0.0, le=2.0)
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_completion_tokens: int = Field(default=512, gt=0, le=8192)
     stream: bool = False
+
 
 class ChoiceMessage(BaseModel):
     """Assistant message nested inside one completion choice."""
@@ -44,6 +49,7 @@ class ChoiceMessage(BaseModel):
     role: Literal["assistant", "system", "user"]
     content: str
 
+
 class Choice(BaseModel):
     """One candidate response from the API."""
 
@@ -52,6 +58,7 @@ class Choice(BaseModel):
     index: int = 0
     message: ChoiceMessage
     finish_reason: str | None = None
+
 
 class Usage(BaseModel):
     """Token counters returned by the API when available."""
@@ -63,8 +70,8 @@ class Usage(BaseModel):
     total_tokens: int = 0
 
 
-class ChatResoonse(BaseModel):
-    """validated non-streaming completion response."""
+class ChatResponse(BaseModel):
+    """Validated non-streaming completion response."""
 
     model_config = ConfigDict(extra="ignore")
 
@@ -80,6 +87,7 @@ class ChatResoonse(BaseModel):
         """Return the first assistant message as plain text."""
         return self.choices[0].message.content.strip()
 
+
 class ModelInfo(BaseModel):
     """One item from the live models endpoint."""
 
@@ -89,6 +97,7 @@ class ModelInfo(BaseModel):
     object: str = "model"
     owned_by: str | None = None
 
+
 class ModelListResponse(BaseModel):
     """Response envelope for the models endpoint."""
 
@@ -96,6 +105,7 @@ class ModelListResponse(BaseModel):
 
     object: str = "list"
     data: list[ModelInfo] = Field(default_factory=list)
+
 
 class AppConfig(BaseModel):
     """User-editable configuration stored as JSON."""
@@ -108,9 +118,8 @@ class AppConfig(BaseModel):
     demo_limit: int = Field(default=10, ge=0, le=10_000)
     demo_prompts_used: int = Field(default=0, ge=0)
 
-    @field_validator
+    @field_validator("api_key")
     @classmethod
-
     def normalise_api_key(cls, value: str | None) -> str | None:
         if value is None:
             return None
@@ -121,17 +130,12 @@ class AppConfig(BaseModel):
 class PromptStat(BaseModel):
     """One JSONL record used by the dashboard."""
 
-    timestamp: datetime = Field(default_factory=lambda:datetime.now(timezone.utc))
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     model: str
     prompt_chars: int = Field(ge=0)
     response_chars: int = Field(ge=0)
-    prompt_chars: int = Field(default=0, ge=0)
+    prompt_tokens: int = Field(default=0, ge=0)
     completion_tokens: int = Field(default=0, ge=0)
     latency_ms: float = Field(ge=0)
     source: Literal["demo", "user"]
     success: bool = True
-    
-
-
-
-
