@@ -1,0 +1,209 @@
+name: Test and release PromptPilot
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint with ruff
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python -m pip install ruff
+
+      - name: Run ruff
+        run: ruff check src tests
+
+  test:
+    name: Test ${{ matrix.os }} on Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run unit and mocked HTTP tests
+        run: python -m pytest --cov=promptpilot --cov-report=term-missing
+
+      - name: Verify CLI contract
+        run: python -m promptpilot --help
+
+      - name: Verify the CLI version flag
+        run: python -m promptpilot --version
+
+  build-linux:
+    name: Build Linux bundle
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build versioned release bundle
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: ./scripts/build_linux.sh
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptpilot-${{ github.ref_name }}-linux-x64
+          path: artifacts/*
+
+  build-windows:
+    name: Build Windows bundle
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build versioned release bundle
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: .\scripts\build_windows.ps1
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptpilot-${{ github.ref_name }}-windows-x64
+          path: artifacts/*
+
+  build-sdist:
+    name: Build Python source distribution
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Build sdist and wheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build
+          python -m build --sdist --wheel --outdir dist
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: promptpilot-${{ github.ref_name }}-python
+          path: dist/*
+
+  release:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-linux, build-windows, build-sdist]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: List release assets
+        run: find artifacts -type f | sort
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          body: |
+            ## Installing PromptPilot ${{ github.ref_name }}
+
+            ### Linux (standalone binary)
+
+            ```bash
+            curl -LO https://github.com/trinay126/PromptPilot/releases/download/${{ github.ref_name }}/promptpilot-${{ github.ref_name }}-linux-x64.tar.gz
+            tar -xzf promptpilot-${{ github.ref_name }}-linux-x64.tar.gz
+            sudo install -m 0755 promptpilot-${{ github.ref_name }}-linux-x64/promptpilot /usr/local/bin/promptpilot
+            promptpilot --version
+            ```
+
+            ### Linux (pipx, recommended)
+
+            ```bash
+            pipx install promptpilot
+            ```
+
+            ### Windows (standalone executable)
+
+            Download `promptpilot-${{ github.ref_name }}-windows-x64.zip`, extract it, and run
+            `promptpilot.exe`. Put the folder on your `PATH` to use it from anywhere.
+
+            ### Any platform (Python package)
+
+            ```bash
+            pip install promptpilot
+            ```
+
+            Verify the download with the `SHA256SUMS.txt` file in each bundle.
+          files: |
+            artifacts/*.tar.gz
+            artifacts/*.zip
+            artifacts/*/SHA256SUMS.txt
+            artifacts/*/release-manifest.json
+            artifacts/*.whl
+            artifacts/*.tar.gz
+            artifacts/*.zip
