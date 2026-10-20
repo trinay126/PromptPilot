@@ -7,7 +7,12 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from promptpilot.constants import DEFAULT_MODEL, DEFAULT_TIMEOUT_SECONDS
+from promptpilot.constants import (
+    DEFAULT_MAX_COMPLETION_TOKENS,
+    DEFAULT_MODEL,
+    DEFAULT_TEMPERATURE,
+    DEFAULT_TIMEOUT_SECONDS,
+)
 
 Role = Literal["system", "user", "assistant"]
 
@@ -36,8 +41,10 @@ class ChatRequest(BaseModel):
 
     model: str = Field(default=DEFAULT_MODEL, min_length=2, max_length=200)
     messages: list[ChatMessage] = Field(min_length=1, max_length=100)
-    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
-    max_completion_tokens: int = Field(default=512, gt=0, le=8192)
+    temperature: float = Field(default=DEFAULT_TEMPERATURE, ge=0.0, le=2.0)
+    max_completion_tokens: int = Field(
+        default=DEFAULT_MAX_COMPLETION_TOKENS, gt=0, le=8192
+    )
     stream: bool = False
 
 
@@ -87,6 +94,11 @@ class ChatResponse(BaseModel):
         """Return the first assistant message as plain text."""
         return self.choices[0].message.content.strip()
 
+    @property
+    def total_tokens(self) -> int:
+        """Return the total token count, or zero when the API omitted usage."""
+        return self.usage.total_tokens if self.usage else 0
+
 
 class ModelInfo(BaseModel):
     """One item from the live models endpoint."""
@@ -126,9 +138,16 @@ class AppConfig(BaseModel):
         cleaned = value.strip()
         return cleaned or None
 
+    @property
+    def demo_prompts_remaining(self) -> int:
+        """Return how many demo prompts are still available."""
+        return max(0, self.demo_limit - self.demo_prompts_used)
+
 
 class PromptStat(BaseModel):
     """One JSONL record used by the dashboard."""
+
+    model_config = ConfigDict(extra="ignore")
 
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     model: str
@@ -139,3 +158,18 @@ class PromptStat(BaseModel):
     latency_ms: float = Field(ge=0)
     source: Literal["demo", "user"]
     success: bool = True
+
+
+__all__ = [
+    "AppConfig",
+    "ChatMessage",
+    "ChatRequest",
+    "ChatResponse",
+    "Choice",
+    "ChoiceMessage",
+    "ModelInfo",
+    "ModelListResponse",
+    "PromptStat",
+    "Role",
+    "Usage",
+]
