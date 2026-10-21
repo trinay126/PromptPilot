@@ -265,8 +265,15 @@ jobs:
             echo "publishing ${#ASSETS[@]} assets"
             printf '  %s\n' "${ASSETS[@]}"
             echo "== creating release =="
+            # A previous failed run can leave a draft release behind. Drafts
+            # are not visible to the public API but still block a new release,
+            # so remove one before creating the real thing.
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft 2>/dev/null | grep -qx true; then
+              echo "removing the stale draft release"
+              gh release delete "$TAG" --yes --cleanup-tag=false --repo "$GITHUB_REPOSITORY" || true
+            fi
             if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              echo "release already exists, uploading with --clobber"
+              echo "release already published, uploading with --clobber"
               gh release upload "$TAG" "${ASSETS[@]}" --clobber --repo "$GITHUB_REPOSITORY"
               gh release edit "$TAG" --title "PromptPilot $TAG" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
             else
