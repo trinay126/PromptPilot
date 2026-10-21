@@ -37,6 +37,9 @@ jobs:
       - name: Run ruff
         run: ruff check src tests
 
+      - name: Lint the workflow files
+        uses: docker://rhysd/actionlint:1.7.7
+
   test:
     name: Test ${{ matrix.os }} on Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -169,6 +172,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      issues: write
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -184,9 +188,11 @@ jobs:
           echo "count=$(wc -l < assets.txt)" >> "$GITHUB_OUTPUT"
 
       - name: Write the release notes
+        env:
+          VERSION: ${{ github.ref_name }}
         run: |
           cat > notes.md <<'NOTES'
-          ## Installing PromptPilot
+          ## Installing PromptPilot ${VERSION}
 
           ### Linux — standalone binary, no Python needed
 
@@ -252,9 +258,6 @@ jobs:
 
       - name: Report a failed release
         if: failure()
-        permissions:
-          contents: write
-          issues: write
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -284,8 +287,6 @@ jobs:
 
       - name: Close stale diagnostics issues
         if: success()
-        permissions:
-          issues: write
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
