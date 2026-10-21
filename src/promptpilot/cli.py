@@ -376,18 +376,28 @@ def models(
     select: bool = typer.Option(
         False, "--select", "-s", help="Pick a model interactively and save it."
     ),
+    show_all: bool = typer.Option(
+        False, "--all", help="Also show models that cannot answer a chat prompt."
+    ),
 ) -> None:
-    """List the live model catalog returned by Groq."""
+    """List the chat models available to your account."""
     current = service()
     result: list = []
     _run(ctx, lambda: result.extend(current.list_models()))
+    usable = [model for model in result if model.is_chat_capable]
+    hidden = len(result) - len(usable)
     if select:
-        _select_and_save(ctx, current, result)
+        _select_and_save(ctx, current, usable)
         return
     if wants_json(ctx):
-        emit_json([item.model_dump() for item in result])
-    else:
-        show_models(result, active=current.config.model)
+        emit_json([item.model_dump() for item in (result if show_all else usable)])
+        return
+    show_models(result if show_all else usable, active=current.config.model)
+    if hidden and not show_all:
+        console.print(
+            f"[muted]{hidden} non-chat model(s) hidden "
+            "(audio, speech, and classifiers). Use --all to see them.[/muted]"
+        )
 
 
 @app.command("select-model")
@@ -395,7 +405,7 @@ def select_model(ctx: typer.Context) -> None:
     """Browse the live model catalog and save the one you choose."""
     current = service()
     result: list = []
-    _run(ctx, lambda: result.extend(current.list_models()))
+    _run(ctx, lambda: result.extend(current.chat_models()))
     _select_and_save(ctx, current, result)
 
 
@@ -494,10 +504,10 @@ def benchmark(
 
     if all_models or not models:
         available: list = []
-        _run(ctx, lambda: available.extend(current.list_models()))
+        _run(ctx, lambda: available.extend(current.chat_models()))
         catalog = [model.id for model in available]
         if not catalog:
-            show_error("Your account has no models available to benchmark.")
+            show_error("Your account has no chat models available to benchmark.")
             raise typer.Exit(code=1)
         if not _confirm_benchmark_plan(len(catalog), rounds):
             show_info("Benchmark cancelled.")

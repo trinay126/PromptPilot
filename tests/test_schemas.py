@@ -89,3 +89,53 @@ def test_config_normalises_blank_api_key_to_none() -> None:
 def test_config_reports_whether_a_key_is_stored() -> None:
     assert AppConfig().has_api_key is False
     assert AppConfig(api_key="gsk_live_key_value").has_api_key is True
+
+
+def test_model_info_hides_non_chat_models() -> None:
+    from promptpilot.schemas import ModelInfo
+
+    chat = ModelInfo(id="llama-3.3-70b-versatile", output_modalities=["text"])
+    assert chat.is_chat_capable is True
+
+
+def test_model_info_hides_transcription_and_speech_models() -> None:
+    from promptpilot.schemas import ModelInfo
+
+    whisper = ModelInfo(id="whisper-large-v3", output_modalities=["transcription"])
+    speech = ModelInfo(id="canopylabs/orpheus-v1-english", output_modalities=["speech"])
+
+    assert whisper.is_chat_capable is False
+    assert speech.is_chat_capable is False
+
+
+def test_model_info_hides_text_classification_models() -> None:
+    from promptpilot.schemas import ModelInfo
+
+    guard = ModelInfo(id="meta-llama/llama-prompt-guard-2-22m", output_modalities=["text"])
+
+    assert guard.is_chat_capable is False
+
+
+def test_model_info_keeps_chat_models_that_look_similar() -> None:
+    """A safety-tuned chat model is still usable, unlike a classifier."""
+    from promptpilot.schemas import ModelInfo
+
+    safeguard = ModelInfo(id="openai/gpt-oss-safeguard-20b", output_modalities=["text"])
+
+    assert safeguard.is_chat_capable is True
+
+
+def test_model_info_hides_inactive_models() -> None:
+    from promptpilot.schemas import ModelInfo
+
+    retired = ModelInfo(id="old-model", output_modalities=["text"], active=False)
+
+    assert retired.is_chat_capable is False
+
+
+def test_model_info_keeps_models_without_modality_information() -> None:
+    from promptpilot.schemas import ModelInfo
+
+    unknown = ModelInfo(id="some-future-model")
+
+    assert unknown.is_chat_capable is True

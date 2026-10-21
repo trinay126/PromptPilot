@@ -42,7 +42,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **12** | **216** | **89%** | **0** |
+| **12** | **226** | **89%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | Platforms |
 |:------------:|:----------:|:-------------:|:----------:|
@@ -69,7 +69,7 @@ adapter could reuse it without rewriting the Groq integration.
 | **Your key, stored once** | `promptpilot config set-key` writes it to your user config directory. It is reused forever — you are never asked again. |
 | **Real streaming** | Server-Sent Events are parsed at the wire level, so tokens render the moment Groq produces them. |
 | **Interactive chat** | A REPL that sends earlier turns back as context, with `/help`, `/history`, `/reset`, and `/exit`. |
-| **Interactive model picker** | Browse the live catalog, grouped by owner, and search it as you type. |
+| **Interactive model picker** | Browse the chat models, grouped by owner, and search them as you type. |
 | **Automation-first** | A global `--json` flag turns every command into a clean JSON document for `jq`, CI, and shell pipelines. |
 | **Honest benchmarks** | Average, median, P95, min, and max latency per model, with the fastest one called out. |
 | **Zero-dependency tests** | `respx` mocks the HTTPX transport, so the suite runs offline, for free, in about a second. |
@@ -424,28 +424,22 @@ you > ╭───────────────────────�
 you > Bye.
 ```
 
-**`promptpilot select-model` — browse the live catalog and pick one interactively:**
+**`promptpilot select-model` — browse the chat models and pick one interactively:**
 
 ```text
 ╭───────────────────────────────────── Select a model ─────────────────────────────────────╮
 │                                                                                          │
-│    Search: type to filter   10 shown                                                     │
+│    Search: type to filter   5 shown                                                      │
 │    ↑/↓ move   enter select   esc cancel   backspace delete                               │
 │                                                                                          │
 │    Alibaba Cloud                                                                         │
-│  ▸   qwen/qwen3.8-27b                    current                                         │
-│    Canopy Labs                                                                           │
-│      canopylabs/orpheus-arabic-saudi                                                     │
-│      canopylabs/orpheus-v1-english                                                       │
-│    Meta                                                                                  │
-│      llama-3.1-8b-instant                                                                │
-│      llama-3.3-70b-versatile                                                             │
-│      meta-llama/llama-prompt-guard-2-22m                                                 │
-│      meta-llama/llama-prompt-guard-2-86m                                                 │
+│  ▸   qwen/qwen3.8-27b                                                                    │
 │    OpenAI                                                                                │
 │      openai/gpt-oss-120b                                                                 │
 │      openai/gpt-oss-20b                                                                  │
 │      openai/gpt-oss-safeguard-20b                                                        │
+│    SDAIA                                                                                 │
+│      allam-2-7b                   current                                                │
 │                                                                                          │
 ╰──────────────────────────────────────────────────────────────────────────────────────────╯
 ```
@@ -462,18 +456,21 @@ llama-3.1-8b-instant
 Caching turns a slow query into a fast one.
 ```
 
-**`promptpilot models` — the live catalog, with your active model marked:**
+**`promptpilot models` — the chat models, with your active model marked:**
 
 ```text
-         Available Groq models
-┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━┓
-┃   ┃ Model ID                ┃ Owner  ┃
-┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━┩
-│ * │ llama-3.1-8b-instant    │ groq   │
-│   │ llama-3.3-70b-versatile │ groq   │
-│   │ openai/gpt-oss-120b     │ openai │
-└───┴─────────────────────────┴────────┘
-* active model   llama-3.1-8b-instant
+               Available Groq models
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃   ┃ Model ID                     ┃ Owner         ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ * │ allam-2-7b                   │ SDAIA         │
+│   │ openai/gpt-oss-120b          │ OpenAI        │
+│   │ openai/gpt-oss-20b           │ OpenAI        │
+│   │ openai/gpt-oss-safeguard-20b │ OpenAI        │
+│   │ qwen/qwen3.8-27b             │ Alibaba Cloud │
+└───┴──────────────────────────────┴───────────────┘
+* active model   allam-2-7b
+6 non-chat model(s) hidden (audio, speech, and classifiers). Use --all to see them.
 ```
 
 **`promptpilot dashboard` — configuration and local usage in one view:**
@@ -494,34 +491,23 @@ Caching turns a slow query into a fast one.
 └─────────────────────┴─────────────────────────────────────────────────┘
 ```
 
-**`promptpilot benchmark` — every model in your catalog, ranked fastest first:**
+**`promptpilot benchmark` — every chat model in your catalog, ranked fastest first:**
 
 ```text
-Benchmarking 11 models x 1 round = 11 requests.
+Benchmarking 5 models x 1 round = 5 requests.
                                   Groq model benchmark
-┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
-┃  # ┃ Model                   ┃  OK ┃  Avg ms ┃  Med ms ┃  P95 ms ┃  Min ms ┃  Max ms ┃
-┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-│  1 │ openai/gpt-oss-safeguar │ 1/1 │  359.27 │  359.27 │  359.27 │  359.27 │  359.27 │
-│    │ d-20b                   │     │         │         │         │         │         │
-│  2 │ allam-2-7b              │ 1/1 │  617.20 │  617.20 │  617.20 │  617.20 │  617.20 │
-│  3 │ qwen/qwen3.8-27b        │ 1/1 │  840.73 │  840.73 │  840.73 │  840.73 │  840.73 │
-│  4 │ openai/gpt-oss-20b      │ 1/1 │  844.11 │  844.11 │  844.11 │  844.11 │  844.11 │
-│  5 │ openai/gpt-oss-120b     │ 1/1 │ 5588.78 │ 5588.78 │ 5588.78 │ 5588.78 │ 5588.78 │
-│  6 │ canopylabs/orpheus-arab │ 0/1 │       - │       - │       - │       - │       - │
-│    │ ic-saudi                │     │         │         │         │         │         │
-│  7 │ meta-llama/llama-prompt │ 0/1 │       - │       - │       - │       - │       - │
-│    │ -guard-2-86m            │     │         │         │         │         │         │
-│  8 │ whisper-large-v3-turbo  │ 0/1 │       - │       - │       - │       - │       - │
-│  9 │ whisper-large-v3        │ 0/1 │       - │       - │       - │       - │       - │
-│ 10 │ meta-llama/llama-prompt │ 0/1 │       - │       - │       - │       - │       - │
-│    │ -guard-2-22m            │     │         │         │         │         │         │
-│ 11 │ canopylabs/orpheus-v1-e │ 0/1 │       - │       - │       - │       - │       - │
-│    │ nglish                  │     │         │         │         │         │         │
-└────┴─────────────────────────┴─────┴─────────┴─────────┴─────────┴─────────┴─────────┘
-Fastest: openai/gpt-oss-safeguard-20b
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃ # ┃ Model                    ┃  OK ┃  Avg ms ┃  Med ms ┃  P95 ms ┃  Min ms ┃  Max ms ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ 1 │ allam-2-7b               │ 1/1 │  291.40 │  291.40 │  291.40 │  291.40 │  291.40 │
+│ 2 │ qwen/qwen3.8-27b         │ 1/1 │  387.39 │  387.39 │  387.39 │  387.39 │  387.39 │
+│ 3 │ openai/gpt-oss-safeguard │ 1/1 │  584.44 │  584.44 │  584.44 │  584.44 │  584.44 │
+│   │ -20b                     │     │         │         │         │         │         │
+│ 4 │ openai/gpt-oss-20b       │ 1/1 │  849.87 │  849.87 │  849.87 │  849.87 │  849.87 │
+│ 5 │ openai/gpt-oss-120b      │ 1/1 │ 1036.06 │ 1036.06 │ 1036.06 │ 1036.06 │ 1036.06 │
+└───┴──────────────────────────┴─────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+Fastest: allam-2-7b
 Slowest: openai/gpt-oss-120b
-6 model(s) failed every round. Run with --json to see the error.
 ```
 
 **An error is a panel with a next step — never a traceback:**
@@ -646,12 +632,46 @@ promptpilot batch \
 
 ### `models`
 
-List the live catalog Groq returns for your account. Your configured model is
+List the chat models available to your account. Your configured model is
 marked with `*`.
 
 ```bash
 promptpilot models
 ```
+
+```text
+               Available Groq models
+┏━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━┓
+┃   ┃ Model ID                     ┃ Owner         ┃
+┡━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━┩
+│ * │ allam-2-7b                   │ SDAIA         │
+│   │ openai/gpt-oss-120b          │ OpenAI        │
+│   │ openai/gpt-oss-20b           │ OpenAI        │
+│   │ openai/gpt-oss-safeguard-20b │ OpenAI        │
+│   │ qwen/qwen3.8-27b             │ Alibaba Cloud │
+└───┴──────────────────────────────┴───────────────┘
+* active model   allam-2-7b
+6 non-chat model(s) hidden (audio, speech, and classifiers). Use --all to see them.
+```
+
+Groq's catalog mixes chat models with **audio transcription** models
+(Whisper), **speech output** models, and **text classification** models (the
+Llama prompt guards, which score a prompt instead of answering it). None of
+those can serve a chat completion, so PromptPilot filters them out of every
+listing, the model picker, and the benchmark. The filter is driven by the
+model's own metadata — its `output_modalities` and its family — not a
+hardcoded list of names, so new models are classified automatically.
+
+Use `--all` to see the raw catalog, including the models that are hidden:
+
+```bash
+promptpilot models --all
+```
+
+| Option | Description |
+|---|---|
+| `--all` | Also show models that cannot answer a chat prompt |
+| `--select`, `-s` | Pick a model interactively and save it |
 
 ### `select-model`
 
@@ -703,35 +723,34 @@ promptpilot history --limit 25
 Compare end-to-end latency for the same prompt across models. This issues a
 real request per model per round, so keep `--rounds` small while exploring.
 
-Run it with no arguments and it benchmarks **every model in your live
+Run it with no arguments and it benchmarks **every chat model in your live
 catalog**, so you can see the whole picture at once:
 
 ```bash
 promptpilot benchmark
 ```
 
-The results come back as a leaderboard, fastest first, with models that failed
-every round listed last:
+The results come back as a leaderboard, fastest first:
 
 ```text
-┏━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
-┃ #  ┃ Model             ┃ OK ┃ Avg ms  ┃ Med ms  ┃ P95 ms  ┃ Min ms  ┃ Max ms  ┃
-┡━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
-│ 1  │ openai/gpt-oss-   │ 1/1│  572.89 │  572.89 │  572.89 │  572.89 │  572.89 │
-│    │ 20b               │    │         │         │         │         │         │
-│ 2  │ openai/gpt-oss-   │ 1/1│ 1837.48 │ 1837.48 │ 1837.48 │ 1837.48 │ 1837.48 │
-│    │ 120b              │    │         │         │         │         │         │
-│ 3  │ whisper-large-v3  │ 0/1│       - │       - │       - │       - │       - │
-└────┴───────────────────┴────┴─────────┴─────────┴─────────┴─────────┴─────────┘
-Fastest: openai/gpt-oss-safeguard-20b
-Slowest: openai/gpt-oss-120b
-6 model(s) failed every round. Run with --json to see the error.
+Benchmarking 5 models x 1 round = 5 requests.
+                                    Groq model benchmark
+┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃ # ┃ Model                        ┃  OK ┃  Avg ms ┃  Med ms ┃  P95 ms ┃  Min ms ┃  Max ms ┃
+┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ 1 │ qwen/qwen3.8-27b             │ 1/1 │  423.02 │  423.02 │  423.02 │  423.02 │  423.02 │
+│ 2 │ openai/gpt-oss-20b           │ 1/1 │  497.89 │  497.89 │  497.89 │  497.89 │  497.89 │
+│ 3 │ openai/gpt-oss-120b          │ 1/1 │  757.02 │  757.02 │  757.02 │  757.02 │  757.02 │
+│ 4 │ openai/gpt-oss-safeguard-20b │ 1/1 │ 1335.34 │ 1335.34 │ 1335.34 │ 1335.34 │ 1335.34 │
+│ 5 │ allam-2-7b                   │ 1/1 │ 1982.10 │ 1982.10 │ 1982.10 │ 1982.10 │ 1982.10 │
+└────┴──────────────────────────────┴─────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+Fastest: qwen/qwen3.8-27b
+Slowest: allam-2-7b
 ```
 
-Not every model in the catalog can answer a chat completion — the Whisper
-models are audio-only, and the Llama prompt guards are content filters. Those
-rows show a dash instead of a misleading `0.00 ms`, and the error is in the
-`--json` output.
+Only chat-capable models are benchmarked, so every row is a real comparison.
+A model that fails every round would show a dash instead of a latency, and
+the error is available in the `--json` output.
 
 Name the models you want to compare by repeating `--model`:
 
@@ -748,7 +767,7 @@ promptpilot benchmark \
 | `--model`, `-m` | every model in your catalog | Models to compare. Repeat the flag for each one. |
 | `--prompt`, `-p` | `Reply with the single word OK.` | Prompt to send each round |
 | `--rounds` | `3` | Repeats per model (1–20) |
-| `--all` | on | Benchmark every model in your live catalog |
+| `--all` | on | Benchmark every chat model in your live catalog |
 
 Because a full sweep means a lot of requests, PromptPilot prints the plan
 first and asks for confirmation whenever the run would exceed 20 requests. You
@@ -1008,7 +1027,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 216 tests, no network, no API key, no network, no API key
+├── tests/                         # 226 tests, no network, no API key, no network, no API key, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -1056,7 +1075,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-216 passed
+226 passed
 89% coverage
 ruff: all checks passed
 ```

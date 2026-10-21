@@ -161,6 +161,7 @@ class PromptPilotService:
         return asyncio.run(self.ask_many_async(prompts, model=model))
 
     def list_models(self) -> list[ModelInfo]:
+        """Return every model in the live catalog, including non-chat ones."""
         key = self._resolve_key()
         with GroqApiClient(
             api_key=key,
@@ -168,6 +169,14 @@ class PromptPilotService:
             timeout_seconds=self.config.timeout_seconds,
         ) as client:
             return client.list_models().data
+
+    def chat_models(self) -> list[ModelInfo]:
+        """Return only the models that can serve a chat completion.
+
+        Groq's catalog also lists audio transcription, speech, and text
+        classification models, which cannot answer a prompt.
+        """
+        return [model for model in self.list_models() if model.is_chat_capable]
 
     def benchmark(
         self, models: list[str], prompt: str, rounds: int = 3

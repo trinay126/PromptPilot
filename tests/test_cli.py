@@ -79,6 +79,9 @@ class FakeService:
     def list_models(self):
         return list(self.catalog)
 
+    def chat_models(self):
+        return [model for model in self.catalog if model.is_chat_capable]
+
     def history(self, limit: int = 10) -> list:
         return []
 
@@ -497,7 +500,7 @@ def test_benchmark_without_a_model_reports_an_empty_catalog(
     result = runner.invoke(app, ["benchmark"])
 
     assert result.exit_code == 1
-    assert "no models available" in result.output
+    assert "no chat models available" in result.output
 
 
 def test_benchmark_with_explicit_models(fake_service: FakeService) -> None:
@@ -509,7 +512,7 @@ def test_benchmark_with_explicit_models(fake_service: FakeService) -> None:
 
 def test_benchmark_all_uses_the_live_catalog(monkeypatch: pytest.MonkeyPatch) -> None:
     double = FakeService()
-    double.list_models = lambda: [
+    double.chat_models = lambda: [
         ModelInfo(id="model-a", owned_by="OpenAI"),
         ModelInfo(id="model-b", owned_by="OpenAI"),
     ]
@@ -523,7 +526,7 @@ def test_benchmark_all_uses_the_live_catalog(monkeypatch: pytest.MonkeyPatch) ->
 
 def test_benchmark_all_asks_before_a_large_run(monkeypatch: pytest.MonkeyPatch) -> None:
     double = FakeService()
-    double.list_models = lambda: [
+    double.chat_models = lambda: [
         ModelInfo(id=f"model-{index}", owned_by="OpenAI") for index in range(30)
     ]
     monkeypatch.setattr("promptpilot.cli.service", lambda: double)
@@ -579,6 +582,7 @@ def test_benchmark_reports_a_catalog_failure_without_a_traceback(
     def boom() -> list:
         raise GroqAPIError("network error while listing models")
 
+    double.chat_models = boom
     double.list_models = boom
     monkeypatch.setattr("promptpilot.cli.service", lambda: double)
 
@@ -587,3 +591,77 @@ def test_benchmark_reports_a_catalog_failure_without_a_traceback(
     assert result.exit_code == 1
     assert "network error while listing models" in result.output
     assert result.exception is None or isinstance(result.exception, SystemExit)
+
+
+def test_models_hides_models_that_cannot_chat(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The default listing only shows models that can answer a prompt."""
+    double = FakeService()
+    double.catalog = [
+        ModelInfo(id="usable-model", owned_by="OpenAI", output_modalities=["text"]),
+        ModelInfo(id="whisper-large-v3", owned_by="OpenAI", output_modalities=["transcription"]),
+        ModelInfo(
+            id="meta-llama/llama-prompt-guard-2-22m",
+            owned_by="Meta",
+            output_modalities=["text"],
+        ),
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["models"])
+
+    assert result.exit_code == 0
+    assert "usable-model" in result.output
+    assert "whisper-large-v3" not in result.output
+    assert "prompt-guard" not in result.output
+    assert "2 non-chat model(s) hidden" in result.output
+
+
+def test_models_all_shows_every_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    double = FakeService()
+    double.catalog = [
+        ModelInfo(id="usable-model", owned_by="OpenAI", output_modalities=["text"]),
+        ModelInfo(id="whisper-large-v3", owned_by="OpenAI", output_modalities=["transcription"]),
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["models", "--all"])
+
+    assert result.exit_code == 0
+    assert "whisper-large-v3" in result.output
+
+
+def test_models_json_mode_hides_non_chat_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    double = FakeService()
+    double.catalog = [
+        ModelInfo(id="usable-model", owned_by="OpenAI", output_modalities=["text"]),
+        ModelInfo(id="whisper-large-v3", owned_by="OpenAI", output_modalities=["transcription"]),
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["--json", "models"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert [item["id"] for item in payload] == ["usable-model"]
+
+
+def test_select_model_only_offers_usable_models(monkeypatch: pytest.MonkeyPatch) -> None:
+    double = FakeService()
+    double.catalog = [
+        ModelInfo(id="usable-model", owned_by="OpenAI", output_modalities=["text"]),
+        ModelInfo(id="whisper-large-v3", owned_by="OpenAI", output_modalities=["transcription"]),
+    ]
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+    monkeypatch.setattr("promptpilot.cli.picker_available", lambda: True)
+    monkeypatch.setattr(
+        "promptpilot.cli.pick_model",
+        lambda console, models, active=None: models[0].id,
+    )
+
+    result = runner.invoke(app, ["select-model"])
+
+    assert result.exit_code == 0
+    assert "usable-model" in result.output
+    assert "whisper-large-v3" not in result.output

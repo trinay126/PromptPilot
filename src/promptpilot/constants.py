@@ -33,6 +33,15 @@ ENV_TIMEOUT_SECONDS: Final[str] = "PROMPTPILOT_TIMEOUT_SECONDS"
 COMPLETE_ENV_VAR: Final[str] = "_PROMPTPILOT_COMPLETE"
 SUPPORTED_SHELLS: Final[tuple[str, ...]] = ("bash", "zsh", "fish")
 
+# Model families that cannot serve a chat completion. Audio transcription and
+# speech models are filtered by their output modality instead, but Groq reports
+# the text classification models as ordinary text models, so they are matched
+# by family here.
+NON_CHAT_MODEL_PATTERNS: Final[tuple[str, ...]] = (
+    "prompt-guard",
+    "nemotron-guard",
+)
+
 # A working example per command, shown when the user gets the syntax wrong.
 EXAMPLES: Final[dict[str, str]] = {
     "ask": 'promptpilot ask "Explain Python decorators"',
@@ -67,5 +76,6 @@ __all__ = [
     "ENV_TIMEOUT_SECONDS",
     "EXAMPLES",
     "GROQ_BASE_URL",
+    "NON_CHAT_MODEL_PATTERNS",
     "SUPPORTED_SHELLS",
 ]

@@ -12,6 +12,7 @@ from promptpilot.constants import (
     DEFAULT_MODEL,
     DEFAULT_TEMPERATURE,
     DEFAULT_TIMEOUT_SECONDS,
+    NON_CHAT_MODEL_PATTERNS,
 )
 
 Role = Literal["system", "user", "assistant"]
@@ -121,6 +122,26 @@ class ModelInfo(BaseModel):
     id: str
     object: str = "model"
     owned_by: str | None = None
+    name: str | None = None
+    active: bool = True
+    context_length: int | None = None
+    output_modalities: list[str] = Field(default_factory=list)
+
+    @property
+    def is_chat_capable(self) -> bool:
+        """Report whether the model can serve a chat completion.
+
+        Groq's catalog mixes chat models with audio transcription models,
+        speech models, and text classification models. The first two are
+        excluded by their output modality; classification models are
+        excluded by family because the API reports them as text models.
+        """
+        if not self.active:
+            return False
+        if self.output_modalities and "text" not in self.output_modalities:
+            return False
+        lowered = self.id.lower()
+        return not any(pattern in lowered for pattern in NON_CHAT_MODEL_PATTERNS)
 
 
 class ModelListResponse(BaseModel):
