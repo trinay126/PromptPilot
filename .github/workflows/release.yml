@@ -38,7 +38,13 @@ jobs:
         run: ruff check src tests
 
       - name: Lint the workflow files
-        uses: docker://rhysd/actionlint:1.7.7
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          curl -sSL --retry 3 -o actionlint.tar.gz \
+            "https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz"
+          tar -xzf actionlint.tar.gz actionlint
+          ./actionlint .github/workflows/*.yml
 
   test:
     name: Test ${{ matrix.os }} on Python ${{ matrix.python-version }}
