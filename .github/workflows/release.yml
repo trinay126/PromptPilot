@@ -167,6 +167,8 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/v')
     needs: [build-linux, build-windows, build-sdist]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all build artifacts
         uses: actions/download-artifact@v4
@@ -174,48 +176,83 @@ jobs:
           path: artifacts
           merge-multiple: true
 
-      - name: List release assets
-        run: find artifacts -type f | sort
+      - name: Collect the release assets
+        id: assets
+        run: |
+          set -euo pipefail
+          find artifacts -type f | sort | tee assets.txt
+          echo "count=$(wc -l < assets.txt)" >> "$GITHUB_OUTPUT"
+
+      - name: Write the release notes
+        run: |
+          cat > notes.md <<'NOTES'
+          ## Installing PromptPilot
+
+          ### Linux — standalone binary, no Python needed
+
+          ```bash
+          curl -LO "https://github.com/trinay126/PromptPilot/releases/download/${VERSION}/promptpilot-${VERSION}-linux-x64.tar.gz"
+          tar -xzf "promptpilot-${VERSION}-linux-x64.tar.gz"
+          sudo install -m 0755 "promptpilot-${VERSION}-linux-x64/promptpilot" /usr/local/bin/promptpilot
+          promptpilot --version
+          ```
+
+          ### Linux — with pipx (recommended)
+
+          ```bash
+          pipx install promptpilot
+          ```
+
+          ### Windows — standalone executable
+
+          Download `promptpilot-${VERSION}-windows-x64.zip`, extract it, and run
+          `promptpilot.exe`. Add the folder to your `PATH` to use it from anywhere.
+
+          ### Any platform — Python package
+
+          ```bash
+          pip install promptpilot
+          ```
+
+          ### Verify the download
+
+          Each bundle ships a `SHA256SUMS.txt` file:
+
+          ```bash
+          sha256sum -c SHA256SUMS.txt
+          ```
+          NOTES
 
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          body: |
-            ## Installing PromptPilot ${{ github.ref_name }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -o pipefail
+          {
+            mapfile -t ASSETS < <(grep -E '\.(tar\.gz|zip|whl)$|SHA256SUMS\.txt$|release-manifest\.json$' assets.txt)
+            echo "publishing ${#ASSETS[@]} assets"
+            printf '%s\n' "${ASSETS[@]}"
+            if gh release view "$TAG" >/dev/null 2>&1; then
+              echo "release already exists, uploading with --clobber"
+              gh release upload "$TAG" "${ASSETS[@]}" --clobber
+              gh release edit "$TAG" --title "PromptPilot $TAG" --notes-file notes.md
+            else
+              gh release create "$TAG" \
+                --title "PromptPilot $TAG" \
+                --notes-file notes.md \
+                --verify-tag \
+                "${ASSETS[@]}"
+            fi
+          } 2>&1 | tee release-output.txt
 
-            ### Linux (standalone binary)
-
-            ```bash
-            curl -LO https://github.com/trinay126/PromptPilot/releases/download/${{ github.ref_name }}/promptpilot-${{ github.ref_name }}-linux-x64.tar.gz
-            tar -xzf promptpilot-${{ github.ref_name }}-linux-x64.tar.gz
-            sudo install -m 0755 promptpilot-${{ github.ref_name }}-linux-x64/promptpilot /usr/local/bin/promptpilot
-            promptpilot --version
-            ```
-
-            ### Linux (pipx, recommended)
-
-            ```bash
-            pipx install promptpilot
-            ```
-
-            ### Windows (standalone executable)
-
-            Download `promptpilot-${{ github.ref_name }}-windows-x64.zip`, extract it, and run
-            `promptpilot.exe`. Put the folder on your `PATH` to use it from anywhere.
-
-            ### Any platform (Python package)
-
-            ```bash
-            pip install promptpilot
-            ```
-
-            Verify the download with the `SHA256SUMS.txt` file in each bundle.
-          files: |
-            artifacts/*.tar.gz
-            artifacts/*.zip
-            artifacts/*/SHA256SUMS.txt
-            artifacts/*/release-manifest.json
-            artifacts/*.whl
-            artifacts/*.tar.gz
-            artifacts/*.zip
+      - name: Publish the failing release output
+        if: failure()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B ci-diagnostics
+          git add -f release-output.txt assets.txt
+          git commit -m "ci release diagnostics ${{ github.ref_name }}"
+          git push --force origin ci-diagnostics
