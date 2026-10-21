@@ -197,6 +197,8 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
         run: |
+          # The heredoc is quoted so the backticks stay literal, which means
+          # the version placeholder has to be substituted afterwards.
           cat > notes.md <<'NOTES'
           ## Installing PromptPilot ${VERSION}
 
@@ -234,6 +236,8 @@ jobs:
           sha256sum -c SHA256SUMS.txt
           ```
           NOTES
+          sed -i "s/\${VERSION}/${VERSION}/g" notes.md
+          grep -c VERSION notes.md && exit 1 || true
 
       - name: Publish the release
         id: publish
