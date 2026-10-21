@@ -46,18 +46,6 @@ jobs:
           tar -xzf actionlint.tar.gz actionlint
           ./actionlint .github/workflows/*.yml
 
-      - name: Publish a CI heartbeat
-        if: always()
-        run: |
-          set -x
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          date -u +%FT%TZ > ci-heartbeat.txt
-          git checkout -B ci-diagnostics || true
-          git add -f ci-heartbeat.txt || true
-          git commit -m "ci heartbeat" || true
-          git push --force origin HEAD:ci-diagnostics || true
-
   test:
     name: Test ${{ matrix.os }} on Python ${{ matrix.python-version }}
     runs-on: ${{ matrix.os }}
@@ -335,17 +323,6 @@ jobs:
           echo "issue response:"
           cat issue-response.json
           echo
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-diagnostics
-          echo "checkout exit=$?"
-          git add -f release-output.txt assets.txt diagnostics.md issue-response.json
-          echo "add exit=$?"
-          git commit -m "ci release diagnostics ${{ github.ref_name }}"
-          echo "commit exit=$?"
-          git push --force origin HEAD:ci-diagnostics
-          echo "push exit=$?"
           exit 0
 
       - name: Close stale diagnostics issues
