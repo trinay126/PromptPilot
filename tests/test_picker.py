@@ -1,6 +1,5 @@
 """Tests for the interactive model picker."""
 
-import select
 import time
 
 import pytest
@@ -103,16 +102,23 @@ def test_render_reports_when_nothing_matches() -> None:
 
 
 def _key_stream(data: bytes):
-    """Return a readable file descriptor pre-loaded with `data`.
+    """Return a readable socket pre-loaded with `data`.
 
     A socket pair is used rather than a regular file because `select.select`
-    only accepts sockets on Windows.
+    only accepts sockets on Windows. The helper waits until every byte has
+    actually arrived, so a test never sees half of an escape sequence.
     """
     import socket
 
     reader, writer = socket.socketpair()
     writer.sendall(data)
     writer.close()
+
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        if len(reader.recv(len(data), socket.MSG_PEEK)) >= len(data):
+            break
+        time.sleep(0.01)
     return reader
 
 
@@ -131,11 +137,6 @@ def test_read_key_decodes_arrow_keys() -> None:
 
     reader = _key_stream(b"\x1b[A")
     try:
-        # Give the bytes time to arrive before the reader looks for them.
-        deadline = time.monotonic() + 2.0
-        while time.monotonic() < deadline:
-            if select.select([reader], [], [], 0.05)[0]:
-                break
         assert _read_key(reader.fileno()) == "up"
     finally:
         reader.close()
