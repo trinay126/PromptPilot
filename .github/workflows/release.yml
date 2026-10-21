@@ -291,11 +291,9 @@ jobs:
             cat assets.txt 2>/dev/null || echo "(none)"
             echo '```'
           } > diagnostics.md
-          gh issue create \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Release diagnostics: ${{ github.ref_name }}" \
-            --body-file diagnostics.md \
-            --label diagnostics 2>&1 | tee -a release-output.txt || true
+
+          # Push the diagnostics to a branch first: it is the most reliable
+          # channel, and the issue below is only a convenience.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-diagnostics 2>/dev/null || true
@@ -303,12 +301,18 @@ jobs:
           git commit -m "ci release diagnostics ${{ github.ref_name }}" 2>/dev/null || true
           git push --force origin HEAD:ci-diagnostics 2>&1 | tee -a release-output.txt || true
 
+          gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Release diagnostics: ${{ github.ref_name }}" \
+            --body-file diagnostics.md 2>&1 | tee -a release-output.txt || true
+
       - name: Close stale diagnostics issues
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh issue list --state open --label diagnostics --limit 20 \
+          gh issue list --state open --limit 20 \
+            --search "Release diagnostics in:title" \
             --json number --jq '.[].number' \
             | while read -r number; do
                 gh issue close "$number" --comment "Resolved by a successful release." || true
