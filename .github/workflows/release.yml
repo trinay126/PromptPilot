@@ -237,7 +237,6 @@ jobs:
 
       - name: Publish the release
         id: publish
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -263,7 +262,7 @@ jobs:
           } 2>&1 | tee release-output.txt
 
       - name: Report a failed release
-        if: failure()
+        if: steps.publish.outcome == 'failure'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
