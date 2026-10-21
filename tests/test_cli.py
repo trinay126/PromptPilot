@@ -566,3 +566,24 @@ def test_broken_pipe_exits_quietly(monkeypatch: pytest.MonkeyPatch) -> None:
         group.main()
 
     assert caught.value.code == 141
+
+
+def test_benchmark_reports_a_catalog_failure_without_a_traceback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A network failure while listing models must be a friendly panel."""
+    from promptpilot.exceptions import GroqAPIError
+
+    double = FakeService()
+
+    def boom() -> list:
+        raise GroqAPIError("network error while listing models")
+
+    double.list_models = boom
+    monkeypatch.setattr("promptpilot.cli.service", lambda: double)
+
+    result = runner.invoke(app, ["benchmark"])
+
+    assert result.exit_code == 1
+    assert "network error while listing models" in result.output
+    assert result.exception is None or isinstance(result.exception, SystemExit)

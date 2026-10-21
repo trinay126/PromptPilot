@@ -493,7 +493,9 @@ def benchmark(
     current = service()
 
     if all_models or not models:
-        catalog = [model.id for model in current.list_models()]
+        available: list = []
+        _run(ctx, lambda: available.extend(current.list_models()))
+        catalog = [model.id for model in available]
         if not catalog:
             show_error("Your account has no models available to benchmark.")
             raise typer.Exit(code=1)
