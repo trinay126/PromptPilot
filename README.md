@@ -1084,9 +1084,8 @@ ruff: all checks passed
 
 ## Releases
 
-Every release publishes four things: a **Linux** standalone binary, a
-**Windows** standalone executable, a **Python wheel**, and a **source
-distribution**. Pick whichever suits you.
+Every release publishes a ready-to-run app for **both platforms**, plus the
+Python packages. Pick whichever suits you.
 
 | Platform | Asset | Needs Python? |
 |---|---|---|
@@ -1095,13 +1094,45 @@ distribution**. Pick whichever suits you.
 | Any | `promptpilot-X.Y.Z-py3-none-any.whl` | yes |
 | Any | `promptpilot-X.Y.Z.tar.gz` | yes |
 
-Download them from the
-[Releases page](https://github.com/trinay126/PromptPilot/releases). Each bundle
-contains a `SHA256SUMS.txt` file so you can verify the download:
+### Install the standalone app
+
+**Linux** — one command, no Python required:
+
+```bash
+VERSION=v1.0.0
+curl -LO "https://github.com/trinay126/PromptPilot/releases/download/${VERSION}/promptpilot-${VERSION}-linux-x64.tar.gz"
+tar -xzf "promptpilot-${VERSION}-linux-x64.tar.gz"
+sudo install -m 0755 "promptpilot-${VERSION}-linux-x64/promptpilot" /usr/local/bin/promptpilot
+promptpilot --version
+```
+
+**Windows** — download `promptpilot-vX.Y.Z-windows-x64.zip`, extract it, and run
+`promptpilot.exe`. Add the folder to your `PATH` to use it from anywhere.
+
+### Install with pipx (recommended on Linux)
+
+Isolated from your system Python, and upgrades with `pipx upgrade promptpilot`:
+
+```bash
+pipx install promptpilot
+```
+
+### Install as a Python package
+
+```bash
+pip install promptpilot
+```
+
+### Verify the download
+
+Each release publishes a combined `SHA256SUMS.txt` covering every asset:
 
 ```bash
 sha256sum -c SHA256SUMS.txt
 ```
+
+All releases are on the
+[Releases page](https://github.com/trinay126/PromptPilot/releases).
 
 ### Linux — standalone binary
 
