@@ -286,10 +286,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           OUTCOME: ${{ steps.publish.outcome }}
         run: |
-          if [ "$OUTCOME" = "success" ]; then
-            echo "The release was published."
-            exit 0
-          fi
+          # This step must never fail: it is the only place the real error is
+          # recorded, so errexit and pipefail are switched off deliberately.
+          set +e
+          set +o pipefail
           {
             echo "### Release output"
             echo
@@ -303,20 +303,22 @@ jobs:
             cat assets.txt 2>/dev/null || echo "(none)"
             echo '```'
           } > diagnostics.md
-
-          # Push the diagnostics to a branch first: it is the most reliable
-          # channel, and the issue below is only a convenience.
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-diagnostics 2>/dev/null || true
-          git add -f release-output.txt assets.txt diagnostics.md 2>/dev/null || true
-          git commit -m "ci release diagnostics ${{ github.ref_name }}" 2>/dev/null || true
-          git push --force origin HEAD:ci-diagnostics 2>&1 | tee -a release-output.txt || true
-
+          git checkout -B ci-diagnostics
+          echo "checkout exit=$?"
+          git add -f release-output.txt assets.txt diagnostics.md
+          echo "add exit=$?"
+          git commit -m "ci release diagnostics ${{ github.ref_name }}"
+          echo "commit exit=$?"
+          git push --force origin HEAD:ci-diagnostics
+          echo "push exit=$?"
           gh issue create \
             --repo "$GITHUB_REPOSITORY" \
             --title "Release diagnostics: ${{ github.ref_name }}" \
-            --body-file diagnostics.md 2>&1 | tee -a release-output.txt || true
+            --body-file diagnostics.md
+          echo "issue exit=$?"
+          exit 0
 
       - name: Close stale diagnostics issues
         if: success()
