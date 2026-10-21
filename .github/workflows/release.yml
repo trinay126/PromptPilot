@@ -244,28 +244,40 @@ jobs:
         run: |
           set -o pipefail
           {
+            echo "== gh version =="
+            gh --version | head -1
+            echo "== auth =="
+            gh auth status 2>&1 | head -5
+            echo "== assets =="
             mapfile -t ASSETS < <(grep -E '\.(tar\.gz|zip|whl)$|SHA256SUMS\.txt$|release-manifest\.json$' assets.txt)
             echo "publishing ${#ASSETS[@]} assets"
             printf '  %s\n' "${ASSETS[@]}"
-            if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "== creating release =="
+            if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
               echo "release already exists, uploading with --clobber"
-              gh release upload "$TAG" "${ASSETS[@]}" --clobber
-              gh release edit "$TAG" --title "PromptPilot $TAG" --notes-file notes.md
+              gh release upload "$TAG" "${ASSETS[@]}" --clobber --repo "$GITHUB_REPOSITORY"
+              gh release edit "$TAG" --title "PromptPilot $TAG" --notes-file notes.md --repo "$GITHUB_REPOSITORY"
             else
               gh release create "$TAG" \
+                --repo "$GITHUB_REPOSITORY" \
                 --title "PromptPilot $TAG" \
                 --notes-file notes.md \
                 --verify-tag \
                 "${ASSETS[@]}"
             fi
-            echo "exit=$?"
+            echo "== done =="
           } 2>&1 | tee release-output.txt
 
       - name: Report a failed release
-        if: steps.publish.outcome == 'failure'
+        if: always()
         env:
           GH_TOKEN: ${{ github.token }}
+          OUTCOME: ${{ steps.publish.outcome }}
         run: |
+          if [ "$OUTCOME" = "success" ]; then
+            echo "The release was published."
+            exit 0
+          fi
           {
             echo "### Release output"
             echo
@@ -280,6 +292,7 @@ jobs:
             echo '```'
           } > diagnostics.md
           gh issue create \
+            --repo "$GITHUB_REPOSITORY" \
             --title "Release diagnostics: ${{ github.ref_name }}" \
             --body-file diagnostics.md \
             --label diagnostics 2>&1 | tee -a release-output.txt || true
