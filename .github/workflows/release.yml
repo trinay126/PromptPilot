@@ -303,21 +303,31 @@ jobs:
             cat assets.txt 2>/dev/null || echo "(none)"
             echo '```'
           } > diagnostics.md
+
+          # Create the diagnostics issue with plain curl so the response body
+          # is always captured, whatever happens.
+          TITLE="Release diagnostics: ${{ github.ref_name }}"
+          BODY=$(jq -Rs . < diagnostics.md)
+          PAYLOAD=$(jq -n --arg title "$TITLE" --arg body "$BODY" '{title:$title, body:$body}')
+          curl -sS -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/issues" \
+            -d "$PAYLOAD" > issue-response.json
+          echo "issue response:"
+          cat issue-response.json
+          echo
+
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git checkout -B ci-diagnostics
           echo "checkout exit=$?"
-          git add -f release-output.txt assets.txt diagnostics.md
+          git add -f release-output.txt assets.txt diagnostics.md issue-response.json
           echo "add exit=$?"
           git commit -m "ci release diagnostics ${{ github.ref_name }}"
           echo "commit exit=$?"
           git push --force origin HEAD:ci-diagnostics
           echo "push exit=$?"
-          gh issue create \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "Release diagnostics: ${{ github.ref_name }}" \
-            --body-file diagnostics.md
-          echo "issue exit=$?"
           exit 0
 
       - name: Close stale diagnostics issues
