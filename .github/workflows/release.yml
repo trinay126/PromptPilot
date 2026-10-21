@@ -223,7 +223,9 @@ jobs:
           ```
           NOTES
 
-      - name: Publish GitHub release
+      - name: Publish the release
+        id: publish
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
@@ -233,7 +235,7 @@ jobs:
           {
             mapfile -t ASSETS < <(grep -E '\.(tar\.gz|zip|whl)$|SHA256SUMS\.txt$|release-manifest\.json$' assets.txt)
             echo "publishing ${#ASSETS[@]} assets"
-            printf '%s\n' "${ASSETS[@]}"
+            printf '  %s\n' "${ASSETS[@]}"
             if gh release view "$TAG" >/dev/null 2>&1; then
               echo "release already exists, uploading with --clobber"
               gh release upload "$TAG" "${ASSETS[@]}" --clobber
@@ -245,14 +247,50 @@ jobs:
                 --verify-tag \
                 "${ASSETS[@]}"
             fi
+            echo "exit=$?"
           } 2>&1 | tee release-output.txt
 
-      - name: Publish the failing release output
+      - name: Report a failed release
         if: failure()
+        permissions:
+          contents: write
+          issues: write
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
+          {
+            echo "### Release output"
+            echo
+            echo '```'
+            cat release-output.txt 2>/dev/null || echo "(nothing captured)"
+            echo '```'
+            echo
+            echo "### Assets found"
+            echo
+            echo '```'
+            cat assets.txt 2>/dev/null || echo "(none)"
+            echo '```'
+          } > diagnostics.md
+          gh issue create \
+            --title "Release diagnostics: ${{ github.ref_name }}" \
+            --body-file diagnostics.md \
+            --label diagnostics 2>&1 | tee -a release-output.txt || true
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -B ci-diagnostics
-          git add -f release-output.txt assets.txt
-          git commit -m "ci release diagnostics ${{ github.ref_name }}"
-          git push --force origin ci-diagnostics
+          git checkout -B ci-diagnostics 2>/dev/null || true
+          git add -f release-output.txt assets.txt diagnostics.md 2>/dev/null || true
+          git commit -m "ci release diagnostics ${{ github.ref_name }}" 2>/dev/null || true
+          git push --force origin HEAD:ci-diagnostics 2>&1 | tee -a release-output.txt || true
+
+      - name: Close stale diagnostics issues
+        if: success()
+        permissions:
+          issues: write
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue list --state open --label diagnostics --limit 20 \
+            --json number --jq '.[].number' \
+            | while read -r number; do
+                gh issue close "$number" --comment "Resolved by a successful release." || true
+              done
