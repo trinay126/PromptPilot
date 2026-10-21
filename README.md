@@ -42,7 +42,7 @@ promptpilot ask "Explain Python decorators in one paragraph."
 
 | Commands | Tests | Coverage | Keys bundled |
 |:--------:|:-----:|:--------:|:------------:|
-| **12** | **213** | **89%** | **0** |
+| **12** | **215** | **89%** | **0** |
 
 | Runtime deps | Test suite | Network in CI | Platforms |
 |:------------:|:----------:|:-------------:|:----------:|
@@ -494,17 +494,34 @@ Caching turns a slow query into a fast one.
 └─────────────────────┴─────────────────────────────────────────────────┘
 ```
 
-**`promptpilot benchmark` — end-to-end latency compared across models:**
+**`promptpilot benchmark` — every model in your catalog, ranked fastest first:**
 
 ```text
-                                Groq model benchmark
-┏━━━━━━━━━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓
-┃ Model           ┃ Success ┃ Average  ┃ Median   ┃ P95      ┃ Min      ┃ Max      ┃
-┡━━━━━━━━━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━╇━━━━━━━━━━┩
-│ llama-3.1-8b-i… │ 2/2     │ 46.66 ms │ 46.66 ms │ 15.88 ms │ 15.88 ms │ 77.45 ms │
-│ llama-3.3-70b-… │ 2/2     │ 18.58 ms │ 18.58 ms │ 17.76 ms │ 17.76 ms │ 19.41 ms │
-└─────────────────┴─────────┴──────────┴──────────┴──────────┴──────────┴──────────┘
-Fastest: llama-3.3-70b-versatile
+Benchmarking 11 models x 1 round = 11 requests.
+                                  Groq model benchmark
+┏━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━┳━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃  # ┃ Model                   ┃  OK ┃  Avg ms ┃  Med ms ┃  P95 ms ┃  Min ms ┃  Max ms ┃
+┡━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━╇━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│  1 │ openai/gpt-oss-safeguar │ 1/1 │  359.27 │  359.27 │  359.27 │  359.27 │  359.27 │
+│    │ d-20b                   │     │         │         │         │         │         │
+│  2 │ allam-2-7b              │ 1/1 │  617.20 │  617.20 │  617.20 │  617.20 │  617.20 │
+│  3 │ qwen/qwen3.8-27b        │ 1/1 │  840.73 │  840.73 │  840.73 │  840.73 │  840.73 │
+│  4 │ openai/gpt-oss-20b      │ 1/1 │  844.11 │  844.11 │  844.11 │  844.11 │  844.11 │
+│  5 │ openai/gpt-oss-120b     │ 1/1 │ 5588.78 │ 5588.78 │ 5588.78 │ 5588.78 │ 5588.78 │
+│  6 │ canopylabs/orpheus-arab │ 0/1 │       - │       - │       - │       - │       - │
+│    │ ic-saudi                │     │         │         │         │         │         │
+│  7 │ meta-llama/llama-prompt │ 0/1 │       - │       - │       - │       - │       - │
+│    │ -guard-2-86m            │     │         │         │         │         │         │
+│  8 │ whisper-large-v3-turbo  │ 0/1 │       - │       - │       - │       - │       - │
+│  9 │ whisper-large-v3        │ 0/1 │       - │       - │       - │       - │       - │
+│ 10 │ meta-llama/llama-prompt │ 0/1 │       - │       - │       - │       - │       - │
+│    │ -guard-2-22m            │     │         │         │         │         │         │
+│ 11 │ canopylabs/orpheus-v1-e │ 0/1 │       - │       - │       - │       - │       - │
+│    │ nglish                  │     │         │         │         │         │         │
+└────┴─────────────────────────┴─────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+Fastest: openai/gpt-oss-safeguard-20b
+Slowest: openai/gpt-oss-120b
+6 model(s) failed every round. Run with --json to see the error.
 ```
 
 **An error is a panel with a next step — never a traceback:**
@@ -686,11 +703,35 @@ promptpilot history --limit 25
 Compare end-to-end latency for the same prompt across models. This issues a
 real request per model per round, so keep `--rounds` small while exploring.
 
-Run it with no arguments and it benchmarks your **preferred model**:
+Run it with no arguments and it benchmarks **every model in your live
+catalog**, so you can see the whole picture at once:
 
 ```bash
 promptpilot benchmark
 ```
+
+The results come back as a leaderboard, fastest first, with models that failed
+every round listed last:
+
+```text
+┏━━━━┳━━━━━━━━━━━━━━━━━━━┳━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┳━━━━━━━━━┓
+┃ #  ┃ Model             ┃ OK ┃ Avg ms  ┃ Med ms  ┃ P95 ms  ┃ Min ms  ┃ Max ms  ┃
+┡━━━━╇━━━━━━━━━━━━━━━━━━━╇━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━╇━━━━━━━━━┩
+│ 1  │ openai/gpt-oss-   │ 1/1│  572.89 │  572.89 │  572.89 │  572.89 │  572.89 │
+│    │ 20b               │    │         │         │         │         │         │
+│ 2  │ openai/gpt-oss-   │ 1/1│ 1837.48 │ 1837.48 │ 1837.48 │ 1837.48 │ 1837.48 │
+│    │ 120b              │    │         │         │         │         │         │
+│ 3  │ whisper-large-v3  │ 0/1│       - │       - │       - │       - │       - │
+└────┴───────────────────┴────┴─────────┴─────────┴─────────┴─────────┴─────────┘
+Fastest: openai/gpt-oss-safeguard-20b
+Slowest: openai/gpt-oss-120b
+6 model(s) failed every round. Run with --json to see the error.
+```
+
+Not every model in the catalog can answer a chat completion — the Whisper
+models are audio-only, and the Llama prompt guards are content filters. Those
+rows show a dash instead of a misleading `0.00 ms`, and the error is in the
+`--json` output.
 
 Name the models you want to compare by repeating `--model`:
 
@@ -702,21 +743,16 @@ promptpilot benchmark \
   --prompt "Reply with the single word OK."
 ```
 
-Or sweep the whole live catalog with `--all`:
-
-```bash
-promptpilot benchmark --all --rounds 1
-```
-
 | Option | Default | Description |
 |---|---|---|
-| `--model`, `-m` | your preferred model | Models to compare. Repeat the flag for each one. |
+| `--model`, `-m` | every model in your catalog | Models to compare. Repeat the flag for each one. |
 | `--prompt`, `-p` | `Reply with the single word OK.` | Prompt to send each round |
 | `--rounds` | `3` | Repeats per model (1–20) |
-| `--all` | off | Benchmark every model in your live catalog |
+| `--all` | on | Benchmark every model in your live catalog |
 
-`--all` can mean a lot of requests, so PromptPilot asks for confirmation
-whenever the run would exceed 20 requests, and you can cancel with `n`.
+Because a full sweep means a lot of requests, PromptPilot prints the plan
+first and asks for confirmation whenever the run would exceed 20 requests. You
+can cancel with `n`, or use `--rounds 1` to keep it cheap.
 
 Latency depends on network conditions, rate limits, and model warm-up, so
 treat the output as an engineering observation rather than a permanent ranking.
@@ -972,7 +1008,7 @@ PromptPilot/
 │   ├── utils.py                   # small pure helpers
 │   ├── constants.py               # shared defaults
 │   └── exceptions.py              # domain error hierarchy
-├── tests/                         # 208 tests, no network, no API key
+├── tests/                         # 215 tests, no network, no API key
 │   ├── conftest.py
 │   ├── test_schemas.py            # validation and constraints
 │   ├── test_config.py             # config round-trip and env overrides
@@ -1020,7 +1056,7 @@ safe to run on every commit and in CI.
 Current status:
 
 ```text
-208 passed
+215 passed
 89% coverage
 ruff: all checks passed
 ```

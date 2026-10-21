@@ -109,7 +109,43 @@ def test_show_benchmark_renders_the_latency_columns(capsys) -> None:
 
     captured = capsys.readouterr()
     assert "test-model" in captured.out
-    assert "1.50 ms" in captured.out
+    assert "Avg ms" in captured.out
+    assert "1.50" in captured.out
+
+
+def test_show_benchmark_marks_failed_models_with_a_dash(capsys) -> None:
+    show_benchmark([
+        BenchmarkSummary(
+            model="working-model",
+            rounds=1,
+            successful=1,
+            failed=0,
+            average_ms=1.5,
+            median_ms=1.5,
+            p95_ms=1.5,
+            min_ms=1.5,
+            max_ms=1.5,
+            samples=(),
+        ),
+        BenchmarkSummary(
+            model="broken-model",
+            rounds=1,
+            successful=0,
+            failed=1,
+            average_ms=0.0,
+            median_ms=0.0,
+            p95_ms=0.0,
+            min_ms=0.0,
+            max_ms=0.0,
+            samples=(),
+        ),
+    ])
+
+    captured = capsys.readouterr()
+    assert "broken-model" in captured.out
+    assert "-" in captured.out
+    # The model that worked must be listed before the one that failed.
+    assert captured.out.index("working-model") < captured.out.index("broken-model")
 
 
 def test_show_workers_reports_the_error_column(capsys) -> None:

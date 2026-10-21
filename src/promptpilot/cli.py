@@ -472,30 +472,35 @@ def benchmark(
         None,
         "--model",
         "-m",
-        help="Models to compare. Repeat the flag for each one. Defaults to your preferred model.",
+        help=(
+            "Models to compare. Repeat the flag for each one. "
+            "Defaults to every model in your catalog."
+        ),
     ),
     prompt: str = typer.Option(
         "Reply with the single word OK.", "--prompt", "-p", help="Prompt to send."
     ),
     rounds: int = typer.Option(3, "--rounds", min=1, max=20),
     all_models: bool = typer.Option(
-        False, "--all", help="Benchmark every model in your live catalog."
+        False, "--all", help="Benchmark every model in your live catalog. This is the default."
     ),
 ) -> None:
-    """Compare end-to-end latency for one prompt across models."""
+    """Compare end-to-end latency for one prompt across models.
+
+    With no `--model` the whole live catalog is benchmarked, so you can see
+    every model your account can use.
+    """
     current = service()
 
-    if all_models:
+    if all_models or not models:
         catalog = [model.id for model in current.list_models()]
         if not catalog:
-            show_error("Your account has no models available.")
+            show_error("Your account has no models available to benchmark.")
             raise typer.Exit(code=1)
-        if not _confirm_large_benchmark(len(catalog), rounds):
+        if not _confirm_benchmark_plan(len(catalog), rounds):
             show_info("Benchmark cancelled.")
             return
         models = catalog
-    elif not models:
-        models = [current.config.model]
 
     result: list = []
     _run(ctx, lambda: result.extend(current.benchmark(models, prompt, rounds)))
@@ -506,17 +511,29 @@ def benchmark(
     fastest = fastest_summary(result)
     if fastest is not None:
         console.print(f"[ok]Fastest:[/ok] {fastest.model}")
+    succeeded = [item for item in result if item.successful]
+    if succeeded:
+        slowest = max(succeeded, key=lambda item: item.average_ms)
+        if slowest is not fastest:
+            console.print(f"[muted]Slowest:[/muted] {slowest.model}")
+    failed = [item for item in result if not item.successful]
+    if failed:
+        console.print(
+            f"[warn]{len(failed)} model(s) failed every round.[/warn] "
+            "[muted]Run with --json to see the error.[/muted]"
+        )
 
 
-def _confirm_large_benchmark(model_count: int, rounds: int) -> bool:
-    """Ask before running a benchmark that would issue many requests."""
+def _confirm_benchmark_plan(model_count: int, rounds: int) -> bool:
+    """Show what a benchmark will cost and ask before a large run."""
     total = model_count * rounds
+    console.print(
+        f"[muted]Benchmarking {model_count} models x {rounds} "
+        f"{'round' if rounds == 1 else 'rounds'} = {total} requests.[/muted]"
+    )
     if total <= 20:
         return True
-    console.print(
-        f"[warn]This will send {total} requests[/warn] "
-        f"({model_count} models x {rounds} rounds)."
-    )
+    console.print(f"[warn]That is {total} API requests.[/warn]")
     try:
         return typer.confirm("Continue?", default=False)
     except (EOFError, KeyboardInterrupt):

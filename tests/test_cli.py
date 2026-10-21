@@ -60,6 +60,7 @@ class FakeService:
         self.streamed: list[tuple[str, str | None]] = []
         self.benchmarked: list[tuple[list[str], str, int]] = []
         self.probed: list[list[str]] = []
+        self.catalog: list[ModelInfo] = []
 
     def ask(self, prompt: str, model: str | None = None) -> ChatResponse:
         self.asked.append((prompt, model))
@@ -76,7 +77,7 @@ class FakeService:
         return [fake_response() for _ in prompts]
 
     def list_models(self):
-        return []
+        return list(self.catalog)
 
     def history(self, limit: int = 10) -> list:
         return []
@@ -476,11 +477,27 @@ def test_select_model_fallback_rejects_an_out_of_range_number(
     assert "No model selected." in result.output
 
 
-def test_benchmark_without_a_model_uses_the_preferred_model(fake_service: FakeService) -> None:
+def test_benchmark_without_a_model_uses_the_whole_catalog(
+    fake_service: FakeService,
+) -> None:
+    fake_service.catalog = [
+        ModelInfo(id="model-a", owned_by="OpenAI"),
+        ModelInfo(id="model-b", owned_by="OpenAI"),
+    ]
+
     result = runner.invoke(app, ["benchmark"])
 
     assert result.exit_code == 0
-    assert fake_service.benchmarked[0][0] == ["test-model"]
+    assert fake_service.benchmarked[0][0] == ["model-a", "model-b"]
+
+
+def test_benchmark_without_a_model_reports_an_empty_catalog(
+    fake_service: FakeService,
+) -> None:
+    result = runner.invoke(app, ["benchmark"])
+
+    assert result.exit_code == 1
+    assert "no models available" in result.output
 
 
 def test_benchmark_with_explicit_models(fake_service: FakeService) -> None:

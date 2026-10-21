@@ -204,24 +204,43 @@ def show_batch(results: list[object]) -> None:
 
 
 def show_benchmark(results: list[BenchmarkSummary]) -> None:
-    """Render a latency comparison across models."""
+    """Render a latency comparison across models, fastest first.
+
+    Models that failed every round are listed last and show a dash, because
+    a failed request has no latency to report.
+    """
     table = Table(
         title="Groq model benchmark",
         title_style="brand",
         header_style="brand.dim",
         border_style="rule",
     )
-    for column in ("Model", "Success", "Average", "Median", "P95", "Min", "Max"):
-        table.add_column(column)
-    for result in results:
+    table.add_column("#", justify="right", style="muted", no_wrap=True)
+    table.add_column("Model", overflow="fold")
+    table.add_column("OK", justify="right", no_wrap=True)
+    for column in ("Avg ms", "Med ms", "P95 ms", "Min ms", "Max ms"):
+        table.add_column(column, justify="right", no_wrap=True)
+
+    ranked = sorted(
+        results,
+        key=lambda item: (item.successful == 0, item.average_ms if item.successful else 0.0),
+    )
+    for index, result in enumerate(ranked, start=1):
+        if result.successful:
+            timings = (
+                f"{result.average_ms:.2f}",
+                f"{result.median_ms:.2f}",
+                f"{result.p95_ms:.2f}",
+                f"{result.min_ms:.2f}",
+                f"{result.max_ms:.2f}",
+            )
+        else:
+            timings = ("-", "-", "-", "-", "-")
         table.add_row(
+            str(index),
             result.model,
             f"{result.successful}/{result.rounds}",
-            format_latency(result.average_ms),
-            format_latency(result.median_ms),
-            format_latency(result.p95_ms),
-            format_latency(result.min_ms),
-            format_latency(result.max_ms),
+            *timings,
         )
     console.print(table)
 
