@@ -261,7 +261,18 @@ jobs:
             echo "== auth =="
             gh auth status 2>&1 | head -5
             echo "== assets =="
-            mapfile -t ASSETS < <(grep -E '\.(tar\.gz|zip|whl)$|SHA256SUMS\.txt$|release-manifest\.json$' assets.txt)
+            # Only the downloadable archives are uploaded. The per-bundle
+            # SHA256SUMS.txt and release-manifest.json already live inside the
+            # archives, and uploading them twice would clash on the asset name.
+            ASSETS=()
+            for candidate in artifacts/*.tar.gz artifacts/*.zip artifacts/*.whl; do
+              [ -f "$candidate" ] && ASSETS+=("$candidate")
+            done
+            # One combined checksum file covering every downloadable asset.
+            ( cd artifacts && find . -maxdepth 1 -type f \
+                \( -name '*.tar.gz' -o -name '*.zip' -o -name '*.whl' \) -printf '%f\n' \
+                | sort | xargs -r sha256sum > SHA256SUMS.txt )
+            ASSETS+=("artifacts/SHA256SUMS.txt")
             echo "publishing ${#ASSETS[@]} assets"
             printf '  %s\n' "${ASSETS[@]}"
             echo "== creating release =="
